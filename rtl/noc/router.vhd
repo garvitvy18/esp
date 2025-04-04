@@ -38,8 +38,8 @@ entity router is
   generic(
     flow_control : integer                      := 0;  --0 = AN; 1 = CB
     width        : integer                      := 34;
-    depth        : integer                      := 4;
-    ports        : std_logic_vector(4 downto 0) := "11111";
+    depth        : integer                      := 16;
+    ports        : std_logic_vector(2 downto 0) := "111";
     DEST_SIZE    : integer;
     QUEUE_SIZE   : integer
     );
@@ -48,36 +48,36 @@ entity router is
     rst : in std_logic;
 
     CONST_localx : in std_logic_vector(YX_WIDTH-1 downto 0);
-    CONST_localy : in std_logic_vector(YX_WIDTH-1 downto 0);
+   -- CONST_localy : in std_logic_vector(YX_WIDTH-1 downto 0);
 
-    data_n_in : in std_logic_vector(width-1 downto 0);
-    data_s_in : in std_logic_vector(width-1 downto 0);
+   -- data_n_in : in std_logic_vector(width-1 downto 0);
+   -- data_s_in : in std_logic_vector(width-1 downto 0);
     data_w_in : in std_logic_vector(width-1 downto 0);
     data_e_in : in std_logic_vector(width-1 downto 0);
     data_p_in : in std_logic_vector(width-1 downto 0);
 
-    data_void_in : in std_logic_vector(4 downto 0);
-    stop_in      : in std_logic_vector(4 downto 0);
+    data_void_in : in std_logic_vector(2 downto 0);
+    stop_in      : in std_logic_vector(2 downto 0);
 
-    data_n_out : out std_logic_vector(width-1 downto 0);
-    data_s_out : out std_logic_vector(width-1 downto 0);
+   -- data_n_out : out std_logic_vector(width-1 downto 0);
+   -- data_s_out : out std_logic_vector(width-1 downto 0);
     data_w_out : out std_logic_vector(width-1 downto 0);
     data_e_out : out std_logic_vector(width-1 downto 0);
     data_p_out : out std_logic_vector(width-1 downto 0);
 
-    data_void_out : out std_logic_vector(4 downto 0);
-    stop_out      : out std_logic_vector(4 downto 0));
+    data_void_out : out std_logic_vector(2 downto 0);
+    stop_out      : out std_logic_vector(2 downto 0));
 end router;
 
 
 
 architecture behavior of router is
 
-  component lookahead_router_wrapper
+  component lookahead_router_wrapper_ring
     generic(
       FlowControl : std_logic;
       Width       : integer;
-      Ports       : std_logic_vector(4 downto 0);
+      Ports       : std_logic_vector(2 downto 0);
       DEST_SIZE   : integer;
       QUEUE_SIZE  : integer
       );
@@ -86,30 +86,30 @@ architecture behavior of router is
       rst : in std_logic;
 
       CONST_localx : in std_logic_vector(YX_WIDTH-1 downto 0);
-      CONST_localy : in std_logic_vector(YX_WIDTH-1 downto 0);
+      --CONST_localy : in std_logic_vector(YX_WIDTH-1 downto 0);
 
-      data_n_in : in std_logic_vector(width-1 downto 0);
-      data_s_in : in std_logic_vector(width-1 downto 0);
+      --data_n_in : in std_logic_vector(width-1 downto 0);
+      --data_s_in : in std_logic_vector(width-1 downto 0);
       data_w_in : in std_logic_vector(width-1 downto 0);
       data_e_in : in std_logic_vector(width-1 downto 0);
       data_p_in : in std_logic_vector(width-1 downto 0);
 
-      data_void_in : in std_logic_vector(4 downto 0);
-      stop_in      : in std_logic_vector(4 downto 0);
+      data_void_in : in std_logic_vector(2 downto 0);
+      stop_in      : in std_logic_vector(2 downto 0);
 
-      data_n_out : out std_logic_vector(width-1 downto 0);
-      data_s_out : out std_logic_vector(width-1 downto 0);
+     -- data_n_out : out std_logic_vector(width-1 downto 0);
+     -- data_s_out : out std_logic_vector(width-1 downto 0);
       data_w_out : out std_logic_vector(width-1 downto 0);
       data_e_out : out std_logic_vector(width-1 downto 0);
       data_p_out : out std_logic_vector(width-1 downto 0);
 
-      data_void_out : out std_logic_vector(4 downto 0);
-      stop_out      : out std_logic_vector(4 downto 0));
+      data_void_out : out std_logic_vector(2 downto 0);
+      stop_out      : out std_logic_vector(2 downto 0));
   end component;
 
 begin
 
-  lookahead_router_wrapper_i: lookahead_router_wrapper
+  lookahead_router_wrapper_i: lookahead_router_wrapper_ring
     generic map (
       FlowControl => to_std_logic(flow_control),
       Width       => width,
@@ -120,16 +120,16 @@ begin
       clk           => clk,
       rst           => rst,
       CONST_localx  => CONST_localx,
-      CONST_localy  => CONST_localy,
-      data_n_in     => data_n_in,
-      data_s_in     => data_s_in,
+     -- CONST_localy  => CONST_localy,
+     -- data_n_in     => data_n_in,
+     -- data_s_in     => data_s_in,
       data_w_in     => data_w_in,
       data_e_in     => data_e_in,
       data_p_in     => data_p_in,
       data_void_in  => data_void_in,
       stop_in       => stop_in,
-      data_n_out    => data_n_out,
-      data_s_out    => data_s_out,
+     -- data_n_out    => data_n_out,
+     -- data_s_out    => data_s_out,
       data_w_out    => data_w_out,
       data_e_out    => data_e_out,
       data_p_out    => data_p_out,

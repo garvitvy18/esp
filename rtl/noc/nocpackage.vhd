@@ -40,11 +40,11 @@ package nocpackage is
 
 
 
-  constant HEADER_ROUTE_L : natural := 4;
-  constant HEADER_ROUTE_E : natural := 3;
-  constant HEADER_ROUTE_W : natural := 2;
-  constant HEADER_ROUTE_S : natural := 1;
-  constant HEADER_ROUTE_N : natural := 0;
+  constant HEADER_ROUTE_L : natural := 2;
+  constant HEADER_ROUTE_E : natural := 1;
+  constant HEADER_ROUTE_W : natural := 0;
+--  constant HEADER_ROUTE_S : natural := 1;
+--  constant HEADER_ROUTE_N : natural := 0;
 
   constant PREAMBLE_WIDTH      : natural := 2;
   constant YX_WIDTH            : natural := GLOB_YX_WIDTH;
@@ -200,7 +200,7 @@ package nocpackage is
 
   type tile_mem_info is record
     x     : local_yx;
-    y     : local_yx;
+--    y     : local_yx;
     haddr : integer;
     hmask : integer;
   end record;
@@ -314,7 +314,7 @@ package nocpackage is
       rst                : in  std_logic;
       rst_tile           : in  std_logic;
       CONST_local_x      : in  std_logic_vector(YX_WIDTH-1 downto 0);
-      CONST_local_y      : in  std_logic_vector(YX_WIDTH-1 downto 0);
+--      CONST_local_y      : in  std_logic_vector(YX_WIDTH-1 downto 0);
       noc1_data_n_in     : in  coh_noc_flit_type;
       noc1_data_s_in     : in  coh_noc_flit_type;
       noc1_data_w_in     : in  coh_noc_flit_type;
@@ -419,20 +419,20 @@ package nocpackage is
   function set_slmddr_id_range
     return integer;
 
-  function get_origin_y (
-    constant flit_sz : integer;
-    flit : max_noc_flit_type)
-    return local_yx;
+--  function get_origin_y (
+--    constant flit_sz : integer;
+--    flit : max_noc_flit_type)
+--    return local_yx;
 
   function get_origin_x (
     constant flit_sz : integer;
     flit : max_noc_flit_type)
     return local_yx;
 
-  function get_destination_y (
-    constant flit_sz : integer;
-    flit : max_noc_flit_type)
-    return local_yx;
+--  function get_destination_y (
+--    constant flit_sz : integer;
+--    flit : max_noc_flit_type)
+--    return local_yx;
 
   function get_destination_x (
     constant flit_sz : integer;
@@ -459,17 +459,17 @@ package nocpackage is
     flit : max_noc_flit_type)
     return std_ulogic;
 
-  function get_origin_y_misc (
-    flit : misc_noc_flit_type)
-    return local_yx;
+--  function get_origin_y_misc (
+--    flit : misc_noc_flit_type)
+--    return local_yx;
 
   function get_origin_x_misc (
     flit : misc_noc_flit_type)
     return local_yx;
 
-  function get_destination_y_misc (
-    flit : misc_noc_flit_type)
-    return local_yx;
+--  function get_destination_y_misc (
+--    flit : misc_noc_flit_type)
+--    return local_yx;
 
   function get_destination_x_misc (
     flit : misc_noc_flit_type)
@@ -501,9 +501,9 @@ package nocpackage is
 
   function create_header (
     constant flit_sz : integer;
-    local_y          : local_yx;
+--    local_y          : local_yx;
     local_x          : local_yx;
-    remote_y         : local_yx;
+--    remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_type)
@@ -511,9 +511,9 @@ package nocpackage is
 
   function create_header_misc (
     constant flit_sz : integer;
-    local_y          : local_yx;
+--    local_y          : local_yx;
     local_x          : local_yx;
-    remote_y         : local_yx;
+--    remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_misc_type)
@@ -521,11 +521,11 @@ package nocpackage is
 
   function create_header_mcast (
     constant flit_sz  : integer;
-    local_y           : local_yx;
+--    local_y           : local_yx;
     local_x           : local_yx;
-    remote_y_arr      : yx_vec(MAX_MCAST_DESTS - 2 downto 0);
+--    remote_y_arr      : yx_vec(MAX_MCAST_DESTS - 2 downto 0);
     remote_x_arr      : yx_vec(MAX_MCAST_DESTS - 2 downto 0);
-    remote_y_comb     : local_yx;
+--    remote_y_comb     : local_yx;
     remote_x_comb     : local_yx;
     mcast_ndests      : integer;
     msg_type          : noc_msg_type)
@@ -544,7 +544,7 @@ package nocpackage is
     constant CFG_XLEN : integer;
     constant CFG_YLEN : integer;
     constant local_x  : local_yx;
-    constant local_y  : local_yx)
+--    constant local_y  : local_yx)
     return ports_vec;
 
   -- IRQ snd packet (Header + 2 flits):
@@ -613,16 +613,16 @@ package body nocpackage is
     end if;
   end;
 
-  function get_origin_y (
-    constant flit_sz : integer;
-    flit : max_noc_flit_type)
-    return local_yx is
-    variable ret : local_yx;
-  begin  -- get_origin_y
-    ret := (others => '0');
-    ret := flit(flit_sz - PREAMBLE_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - YX_WIDTH);
-    return ret;
-  end get_origin_y;
+--  function get_origin_y (
+--    constant flit_sz : integer;
+--    flit : max_noc_flit_type)
+--    return local_yx is
+--    variable ret : local_yx;
+--  begin  -- get_origin_y
+--    ret := (others => '0');
+--    ret := flit(flit_sz - PREAMBLE_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - YX_WIDTH);
+--    return ret;
+--  end get_origin_y;
 
   function get_origin_x (
     constant flit_sz : integer;
@@ -635,16 +635,16 @@ package body nocpackage is
     return ret;
   end get_origin_x;
 
-  function get_destination_y (
-    constant flit_sz : integer;
-    flit : max_noc_flit_type)
-    return local_yx is
-    variable ret : local_yx;
-  begin  -- get_destination_y
-    ret := (others => '0');
-    ret := flit(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - YX_WIDTH);
-    return ret;
-  end get_destination_y;
+ -- function get_destination_y (
+ --   constant flit_sz : integer;
+ --   flit : max_noc_flit_type)
+ --   return local_yx is
+ --   variable ret : local_yx;
+ -- begin  -- get_destination_y
+ --   ret := (others => '0');
+ --   ret := flit(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - YX_WIDTH);
+ --   return ret;
+ -- end get_destination_y;
 
   function get_destination_x (
     constant flit_sz : integer;
@@ -700,15 +700,15 @@ package body nocpackage is
     return ret;
   end get_unused_msb_field;
 
-  function get_origin_y_misc (
-    flit : misc_noc_flit_type)
-    return local_yx is
-    variable ret : local_yx;
-  begin  -- get_origin_y
-    ret := (others => '0');
-    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH);
-    return ret;
-  end get_origin_y_misc;
+--  function get_origin_y_misc (
+--    flit : misc_noc_flit_type)
+--    return local_yx is
+--    variable ret : local_yx;
+--  begin  -- get_origin_y
+--    ret := (others => '0');
+--    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH);
+--    return ret;
+--  end get_origin_y_misc;
 
   function get_origin_x_misc (
     flit : misc_noc_flit_type)
@@ -720,15 +720,15 @@ package body nocpackage is
     return ret;
   end get_origin_x_misc;
 
-  function get_destination_y_misc (
-    flit : misc_noc_flit_type)
-    return local_yx is
-    variable ret : local_yx;
-  begin  -- get_destination_y
-    ret := (others => '0');
-    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - YX_WIDTH);
-    return ret;
-  end get_destination_y_misc;
+--  function get_destination_y_misc (
+--    flit : misc_noc_flit_type)
+--    return local_yx is
+--    variable ret : local_yx;
+--  begin  -- get_destination_y
+--    ret := (others => '0');
+--    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - YX_WIDTH);
+--    return ret;
+--  end get_destination_y_misc;
 
   function get_destination_x_misc (
     flit : misc_noc_flit_type)
@@ -803,53 +803,93 @@ package body nocpackage is
 
   function create_header (
     constant flit_sz : integer;
-    local_y          : local_yx;
+--    local_y          : local_yx;
     local_x          : local_yx;
-    remote_y         : local_yx;
+--    remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_type)
     return std_logic_vector is
     variable header                            : std_logic_vector(flit_sz - 1 downto 0);
     variable go_left, go_right, go_up, go_down : std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
+--    variable dist_cw, dist_ccw : std_logic_vector(YX_WIDTH - 1 downto 0);
+    variable local_x_int   : integer;
+    variable remote_x_int  : integer;
+    variable dist_cw       : integer;
+    variable dist_ccw      : integer;
   begin  -- create_header
     header := (others => '0');
     header(flit_sz - 1 downto
            flit_sz - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
+  --  header(flit_sz - PREAMBLE_WIDTH - 1 downto
+  --         flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_y;
     header(flit_sz - PREAMBLE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_y;
+           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_x;
+  --  header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
+  --         flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := remote_y;
     header(flit_sz - PREAMBLE_WIDTH - YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := local_x;
+           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := remote_x;
     header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := remote_y;
-    header(flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH) := remote_x;
-    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
-    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH) := reserved;
+           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
+    header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH) := reserved;
 
-    if local_x < remote_x then
-      go_right := "01000";
+--    if local_x < remote_x then
+--      go_right := "01000";
+--    else
+--      go_right := "10111";
+--    end if;
+--
+--    if local_x > remote_x then
+--      go_left := "00100";
+--    else
+--      go_left := "11011";
+--    end if;
+--
+--    if local_y < remote_y then
+--      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01110" and go_left and go_right;
+--    else
+--      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01101" and go_left and go_right;
+--    end if;
+--
+--    if local_y = remote_y and local_x = remote_x then
+--      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "10000";
+--    end if;
+
+  -- Convert to integers
+  local_x_int  := to_integer(unsigned(local_x));
+  remote_x_int := to_integer(unsigned(remote_x));
+
+  -- Compute wraparound distances
+  dist_cw  := (remote_x_int - local_x_int + CFG_XLEN) mod CFG_XLEN;
+  dist_ccw := (local_x_int - remote_x_int + CFG_XLEN) mod CFG_XLEN;
+
+    -- Compute direction control signals
+  if local_x_int < remote_x_int then
+    if dist_cw > dist_ccw then
+      go_left  := "001";
+      go_right := "101";
     else
-      go_right := "10111";
+      go_right := "010";
+      go_left  := "110";
     end if;
-
-    if local_x > remote_x then
-      go_left := "00100";
+  elsif local_x_int > remote_x_int then
+    if dist_cw > dist_ccw then
+      go_left  := "001";
+      go_right := "101";
     else
-      go_left := "11011";
+      go_right := "010";
+      go_left  := "110";
     end if;
+  end if;
 
-    if local_y < remote_y then
-      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01110" and go_left and go_right;
-    else
-      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01101" and go_left and go_right;
-    end if;
+  -- Set direction bits in header
+  header(NEXT_ROUTING_WIDTH - 1 downto 0) := "011" and go_left and go_right;
 
-    if local_y = remote_y and local_x = remote_x then
-      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "10000";
-    end if;
+  -- Handle local delivery case
+  if local_x_int = remote_x_int then
+    header(NEXT_ROUTING_WIDTH - 1 downto 0) := "100";
+  end if;
 
     return header;
   end create_header;
@@ -1046,7 +1086,7 @@ function create_header_mcast (
     constant CFG_XLEN : integer;
     constant CFG_YLEN : integer;
     constant local_x  : local_yx;
-    constant local_y  : local_yx)
+--    constant local_y  : local_yx)
     return ports_vec is
     variable ports : ports_vec;
   begin
