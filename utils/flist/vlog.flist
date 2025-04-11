@@ -29,12 +29,12 @@ caches/esp-caches/common/rtl/interface_controller.sv
 misc/esplink.sv
 sockets/adapters/apb2axil.sv
 noc/router/noc_pkg.sv
-noc/router/router_fifo.sv
-noc/router/router_arbiter.sv
+noc/router/dut_sync/router_fifo.sv
+noc/router/dut_sync/router_arbiter.sv
 noc/router/router_mcast_arbiter.sv
-noc/router/lookahead_routing.sv
+noc/router/dut_sync/lookahead_routing.sv
 noc/router/lookahead_routing_multicast.sv
-noc/router/lookahead_router.sv
+noc/router/dut_sync/lookahead_router.sv
 noc/router/lookahead_router_multicast.sv
-noc/router/lookahead_router_wrapper.sv
+noc/router/dut_sync/lookahead_router_wrapper.sv
 techmap/maps/clkdiv1234.v
