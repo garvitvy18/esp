@@ -33,5 +33,5 @@ noc/noc_ring/dut_sync/router/router_fifo.sv
 noc/noc_ring/dut_sync/router/router_arbiter.sv
 noc/noc_ring/dut_sync/router/lookahead_routing.sv
 noc/noc_ring/dut_sync/router/lookahead_router.sv
-noc/router/lookahead_router_wrapper.sv
+noc/noc_ring/dut_sync/router/lookahead_router_wrapper.sv
 techmap/maps/clkdiv1234.v
