@@ -207,7 +207,7 @@ package nocpackage is
 
   constant tile_mem_info_none : tile_mem_info := (
     x => (others => '0'),
-    y => (others => '0'),
+--    y => (others => '0'),
     haddr => 16#000#,
     hmask => 16#fff#
     );

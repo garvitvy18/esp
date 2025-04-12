@@ -70,27 +70,27 @@ architecture mesh of noc32_xy is
     --   ...    - ...   ...   ... -      ...
     --    |        |     |     |          |
     -- YLEN-1,0 - ...   ...   ... - YLEN-1,XLEN-1
-    for i in 0 to YLEN-1 loop
-      for j in 0 to XLEN-1 loop
+   -- for i in 0 to YLEN-1 loop
+      for i in 0 to XLEN-1 loop
         -- local ports are all set
-        ports(i * XLEN + j)(4) := '1';
-        if j /= XLEN-1 then
+        ports(i)(2) := '1';
+       -- if i /= XLEN-1 then
           -- east ports
-          ports(i * XLEN + j)(3) := '1';
-        end if;
-        if j /= 0 then
+        ports(i)(1) := '1';
+       -- end if;
+       -- if j /= 0 then
           -- west ports
-          ports(i * XLEN + j)(2) := '1';
-        end if;
-        if i /= YLEN-1 then
-          -- south ports
-          ports(i * XLEN + j)(1) := '1';
-        end if;
-        if i /= 0 then
-          -- nord ports
-          ports(i * XLEN + j)(0) := '1';
-        end if;
-      end loop;  -- j
+          ports(i)(0) := '1';
+       -- end if;
+      --  if i /= YLEN-1 then
+      --    -- south ports
+      --    ports(i * XLEN + j)(1) := '1';
+      --  end if;
+      --  if i /= 0 then
+      --    -- north ports
+      --    ports(i * XLEN + j)(0) := '1';
+      --  end if;
+      -- end loop;  -- j
     end loop;  -- i
     return ports;
   end set_router_ports;
