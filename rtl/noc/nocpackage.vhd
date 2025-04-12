@@ -51,7 +51,7 @@ package nocpackage is
   constant MSG_TYPE_WIDTH      : natural := 5;
   constant RESERVED_WIDTH      : natural := 8;
   constant RESERVED_WIDTH_MISC : natural := 6;
-  constant NEXT_ROUTING_WIDTH  : natural := 5;
+  constant NEXT_ROUTING_WIDTH  : natural := 3;
   constant COH_NOC_FLIT_SIZE       : natural := PREAMBLE_WIDTH + COH_NOC_WIDTH;
   constant DMA_NOC_FLIT_SIZE       : natural := PREAMBLE_WIDTH + DMA_NOC_WIDTH;
   constant MISC_NOC_FLIT_SIZE  : natural := PREAMBLE_WIDTH + 32;
@@ -1086,7 +1086,8 @@ function create_header_mcast (
     constant CFG_XLEN : integer;
     constant CFG_YLEN : integer;
     constant local_x  : local_yx;
---    constant local_y  : local_yx)
+--    constant local_y  : local_yx
+			     )
     return ports_vec is
     variable ports : ports_vec;
   begin
