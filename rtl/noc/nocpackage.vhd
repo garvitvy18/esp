@@ -200,14 +200,14 @@ package nocpackage is
 
   type tile_mem_info is record
     x     : local_yx;
---    y     : local_yx;
+    y     : local_yx;
     haddr : integer;
     hmask : integer;
   end record;
 
   constant tile_mem_info_none : tile_mem_info := (
     x => (others => '0'),
---    y => (others => '0'),
+    y => (others => '0'),
     haddr => 16#000#,
     hmask => 16#fff#
     );
@@ -511,9 +511,9 @@ package nocpackage is
 
   function create_header_misc (
     constant flit_sz : integer;
---    local_y          : local_yx;
+    local_y          : local_yx;
     local_x          : local_yx;
---    remote_y         : local_yx;
+    remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_misc_type)
@@ -521,11 +521,11 @@ package nocpackage is
 
   function create_header_mcast (
     constant flit_sz  : integer;
---    local_y           : local_yx;
+    local_y           : local_yx;
     local_x           : local_yx;
---    remote_y_arr      : yx_vec(MAX_MCAST_DESTS - 2 downto 0);
+    remote_y_arr      : yx_vec(MAX_MCAST_DESTS - 2 downto 0);
     remote_x_arr      : yx_vec(MAX_MCAST_DESTS - 2 downto 0);
---    remote_y_comb     : local_yx;
+    remote_y_comb     : local_yx;
     remote_x_comb     : local_yx;
     mcast_ndests      : integer;
     msg_type          : noc_msg_type)
@@ -543,8 +543,9 @@ package nocpackage is
     constant TECH     : integer;
     constant CFG_XLEN : integer;
     constant CFG_YLEN : integer;
-    constant local_x  : local_yx;
+    constant local_x  : local_yx
 --    constant local_y  : local_yx)
+    )
     return ports_vec;
 
   -- IRQ snd packet (Header + 2 flits):
@@ -1085,42 +1086,42 @@ function create_header_mcast (
     constant TECH     : integer;
     constant CFG_XLEN : integer;
     constant CFG_YLEN : integer;
-    constant local_x  : local_yx;
+    constant local_x  : local_yx
 --    constant local_y  : local_yx
 			     )
     return ports_vec is
     variable ports : ports_vec;
-  begin
-    -- initialize all local ports set
-    ports := (others => '1');
-    -- nord ports removed in top tiles
-    if local_y = conv_std_logic_vector(0, YX_WIDTH) then
-      ports(0) := '0';
-    end if;
-    -- west ports removed in left edge tiles
-    if local_x = conv_std_logic_vector(0, YX_WIDTH) then
-      ports(2) := '0';
-    end if;
-    if is_fpga(TECH) /= 0 then
-      -- On FPGA we want to simplify logic as much as possible.
-      -- For ASIC flow, however, we want to minimize the number of tiles that
-      -- differ due to router's ports. We assume that routers are placed on the
-      -- bottom-right corner of each tile, so leaving east and south ports
-      -- enabled won't incur long dangling metal lines. Unused ports should
-      -- have inputs tied to VSS, except for void signals, which must be tied
-      -- to VDD.
-
-      -- south ports removed in bottom tiles
-      if (to_integer(unsigned(local_y))) = CFG_YLEN-1 then
-        ports(1) := '0';
-      end if;
-      -- east ports removed in right edge tiles
-      if (to_integer(unsigned(local_x))) = CFG_XLEN-1 then
-        ports(3) := '0';
-      end if;
-
-    end if;
+ begin
+    ports := (others => '0');
+    --   0,0    - 0,1 - 0,2 - ... -    0,XLEN-1
+    --    |        |     |     |          |
+    --   1,0    - ...   ...   ... -    1,XLEN-1
+    --    |        |     |     |          |
+    --   ...    - ...   ...   ... -      ...
+    --    |        |     |     |          |
+    -- YLEN-1,0 - ...   ...   ... - YLEN-1,XLEN-1
+   -- for i in 0 to YLEN-1 loop
+      for i in 0 to CFG_XLEN-1 loop
+        -- local ports are all set
+        ports(2) := '1';
+       -- if i /= XLEN-1 then
+          -- east ports
+        ports(1) := '1';
+       -- end if;
+       -- if j /= 0 then
+          -- west ports
+          ports(0) := '1';
+       -- end if;
+      --  if i /= YLEN-1 then
+      --    -- south ports
+      --    ports(i * XLEN + j)(1) := '1';
+      --  end if;
+      --  if i /= 0 then
+      --    -- north ports
+      --    ports(i * XLEN + j)(0) := '1';
+      --  end if;
+      -- end loop;  -- j
+    end loop;  -- i
     return ports;
-  end set_router_ports;
-
+    end set_router_ports;
 end nocpackage;
