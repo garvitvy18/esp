@@ -148,9 +148,9 @@ architecture ring of noc32_xy is
       flow_control : integer;
       width        : integer;
       depth        : integer;
-      ports        : std_logic_vector(4 downto 0);
-      localx       : std_logic_vector(YX_WIDTH-1 downto 0);
---      localy       : std_logic_vector(YX_WIDTH-1 downto 0));
+      ports        : std_logic_vector(2 downto 0);
+      localx       : std_logic_vector(YX_WIDTH-1 downto 0));
+--     localy       : std_logic_vector(YX_WIDTH-1 downto 0));
 
     port (
       clk           : in  std_logic;
@@ -235,8 +235,9 @@ end generate ringgen;
           width        => MISC_NOC_FLIT_SIZE,
           depth        => ROUTER_DEPTH,
           ports        => ROUTER_PORTS(k),
-          localx        => localx(k),
-          localy        => localy(k))
+          localx        => localx(k)
+  --        localy        => localy(k)
+  	)
       port map (
           clk           => clk,
           rst           => rst,

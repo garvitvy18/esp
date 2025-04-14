@@ -38,7 +38,7 @@ entity asic_tile_acc is
     this_has_l2       : integer range 0 to 1 := 0;
     this_has_token_pm : integer range 0 to 1 := 0;
     HAS_SYNC          : integer range 0 to 1 := 1;
-    ROUTER_PORTS      : ports_vec            := "11111";
+    ROUTER_PORTS      : ports_vec            := "111";
     this_has_dco      : integer range 0 to 2 := 0);
   port (
     rst                : in  std_ulogic;

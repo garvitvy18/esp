@@ -37,7 +37,7 @@ entity fpga_tile_acc is
     this_irq_type      : integer              := 0;
     this_has_l2        : integer range 0 to 1 := 0;
     this_has_token_pm  : integer range 0 to 1 := 0;
-    ROUTER_PORTS       : ports_vec            := "11111";
+    ROUTER_PORTS       : ports_vec            := "111";
     HAS_SYNC           : integer range 0 to 1 := 1);
   port (
     rst                : in  std_ulogic;

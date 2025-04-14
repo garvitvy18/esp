@@ -588,7 +588,7 @@ begin  -- rtl
     end if;
 
     if msg_type = REQ_P2P then
-      p2p_header_v := create_header(DMA_NOC_FLIT_SIZE, local_y, local_x, p2p_src_y, p2p_src_x, msg_type, hprot);
+      p2p_header_v := create_header(DMA_NOC_FLIT_SIZE, local_x, p2p_src_x, msg_type, hprot);
       p2p_header_v(DMA_NOC_FLIT_SIZE-1 downto DMA_NOC_FLIT_SIZE-PREAMBLE_WIDTH) := PREAMBLE_HEADER;
     else
       p2p_header_v := create_header_mcast(DMA_NOC_FLIT_SIZE, local_y, local_x,
@@ -598,7 +598,7 @@ begin  -- rtl
     end if;
 
     header_v := (others => '0');
-    header_v := create_header(DMA_NOC_FLIT_SIZE, local_y, local_x, mem_y, mem_x, msg_type, hprot);
+    header_v := create_header(DMA_NOC_FLIT_SIZE, local_x, mem_x, msg_type, hprot);
     if is_p2p = '0' then
       header <= header_v;
     else

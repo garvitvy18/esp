@@ -1690,7 +1690,7 @@ begin  -- architecture rtl
             req_id(llc_fwd_out_data_req_id'length - 1 downto 0)            := llc_fwd_out_data_req_id;
 
             coherence_fwd_wrreq <= '1';
-            coherence_fwd_data_in <= create_header(COH_NOC_FLIT_SIZE, local_y, local_x, dest_y, dest_x,
+            coherence_fwd_data_in <= create_header(COH_NOC_FLIT_SIZE, local_x, dest_x,
                                                    reg.coh_msg, req_id);
 
             reg.state := send_addr;
@@ -1827,7 +1827,7 @@ begin  -- architecture rtl
 
             coherence_rsp_snd_wrreq <= '1';
             coherence_rsp_snd_data_in <=
-              create_header(COH_NOC_FLIT_SIZE, local_y, local_x, dest_y, dest_x,
+              create_header(COH_NOC_FLIT_SIZE, local_x, dest_x,
                             mix_msg, reserved);
 
             reg.state := send_addr;
@@ -1859,7 +1859,7 @@ begin  -- architecture rtl
 
           coherence_rsp_snd_wrreq <= '1';
           coherence_rsp_snd_data_in <=
-            create_header(COH_NOC_FLIT_SIZE, local_y, local_x, reg.dest_y, reg.dest_x,
+            create_header(COH_NOC_FLIT_SIZE, local_x, reg.dest_x,
                           mix_msg, reg.reserved);
 
           reg.state := send_addr;
@@ -2011,7 +2011,7 @@ begin  -- architecture rtl
           if dma_snd_full = '0' then
 
             dma_snd_wrreq <= '1';
-            dma_snd_data_in <= create_header(DMA_NOC_FLIT_SIZE, local_y, local_x, dest_y,
+            dma_snd_data_in <= create_header(DMA_NOC_FLIT_SIZE, local_x,
                                              dest_x, mix_msg, (others => '0'));
 
             reg.state := send_data_dma;
@@ -2041,7 +2041,7 @@ begin  -- architecture rtl
         if dma_snd_full = '0' then
 
           dma_snd_wrreq   <= '1';
-          dma_snd_data_in <= create_header(DMA_NOC_FLIT_SIZE, local_y, local_x, reg.dest_y, reg.dest_x, mix_msg, (others => '0'));
+          dma_snd_data_in <= create_header(DMA_NOC_FLIT_SIZE, local_x, reg.dest_x, mix_msg, (others => '0'));
 
           reg.state := send_data_dma;
 

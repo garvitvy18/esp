@@ -185,7 +185,7 @@ end entity noc_domain_socket;
 architecture rtl of noc_domain_socket is
 
   -- Tile parameters
---  signal this_local_y : local_yx;
+  signal this_local_y : local_yx;
   signal this_local_x : local_yx;
 
   -- Token-based power management config and status
@@ -306,7 +306,7 @@ architecture rtl of noc_domain_socket is
   signal noc6_output_port            : dma_noc_flit_type;
 
   attribute keep : string;
---  attribute keep of this_local_y                 : signal is "true";
+  attribute keep of this_local_y                 : signal is "true";
   attribute keep of this_local_x                 : signal is "true";
   attribute keep of tile_config_int              : signal is "true";
   attribute keep of tile_id                      : signal is "true";
@@ -533,7 +533,7 @@ begin  -- architecture rtl
       rst                => noc_rstn_s,   -- rst
       rst_tile           => tile_rstn,   -- tile_rstn
       CONST_local_x      => this_local_x,
---      CONST_local_y      => this_local_y,
+      CONST_local_y      => this_local_y,
 --      noc1_data_n_in     => noc1_data_n_in,
 --      noc1_data_s_in     => noc1_data_s_in,
       noc1_data_w_in     => noc1_data_w_in,
@@ -637,7 +637,7 @@ begin  -- architecture rtl
         noc_clk            => noc_clk,
         tile_clk           => tile_clk,
         local_x            => this_local_x,
- --       local_y            => this_local_y,
+        local_y            => this_local_y,
         pm_config          => pm_config,
         pm_status          => pm_status,
         noc5_input_port    => noc5_input_port_pm,
@@ -713,7 +713,7 @@ begin  -- architecture rtl
   this_csr_pindex  <= tile_csr_pindex(tile_id);
   this_csr_pconfig <= fixed_apbo_pconfig(this_csr_pindex);
 
---  this_local_y <= tile_y(tile_id);
+  this_local_y <= tile_y(tile_id);
   this_local_x <= tile_x(tile_id);
 
   dco_clk_delay_sel <= tile_config_int(ESP_CSR_DCO_CFG_MSB downto ESP_CSR_DCO_CFG_MSB - 11);
@@ -766,7 +766,7 @@ begin  -- architecture rtl
     port map (
       rst              => noc_rstn_s,   -- rst
       clk              => noc_clk,      -- noc_clk_int
---      local_y          => this_local_y,
+      local_y          => this_local_y,
       local_x          => this_local_x,
       apbi             => apbi,
       apbo             => apbo,

@@ -39,7 +39,7 @@ entity asic_tile_io is
   generic (
     SIMULATION   : boolean   := false;
     HAS_SYNC     : integer range 0 to 1 := 1;
-    ROUTER_PORTS : ports_vec := "11111";
+    ROUTER_PORTS : ports_vec := "111";
     this_has_dco : integer range 0 to 2 := 1); -- 0: no DCO, 1: tile and NoC DCO
                                                -- 2: NoC DCO only
   port (

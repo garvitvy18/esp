@@ -37,7 +37,7 @@ use work.tiles_pkg.all;
 entity fpga_tile_mem is
   generic (
     SIMULATION   : boolean              := false;
-    ROUTER_PORTS : ports_vec            := "11111";
+    ROUTER_PORTS : ports_vec            := "111";
     HAS_SYNC     : integer range 0 to 1 := 1);
   port (
     rst                : in  std_ulogic;

@@ -267,7 +267,7 @@ begin  -- rtl
     header_v := (others => '0');
     origin_y := get_origin_y(this_coh_flit_size, this_noc_flit_pad & narrow_coherence_req_data_out);
     origin_x := get_origin_x(this_coh_flit_size, this_noc_flit_pad & narrow_coherence_req_data_out);
-    header_v := create_header(this_coh_flit_size, local_y, local_x, origin_y, origin_x, msg_type, reserved);
+    header_v := create_header(this_coh_flit_size, local_x, origin_x, msg_type, reserved);
     header   <= header_v;
   end process make_rsp_snd_packet;
   -----------------------------------------------------------------------------
@@ -291,7 +291,7 @@ begin  -- rtl
     header_v   := (others => '0');
     origin_y   := get_origin_y(DMA_NOC_FLIT_SIZE, dma_noc_flit_pad & dma_rcv_data_out);
     origin_x   := get_origin_x(DMA_NOC_FLIT_SIZE, dma_noc_flit_pad & dma_rcv_data_out);
-    header_v   := create_header(DMA_NOC_FLIT_SIZE, local_y, local_x, origin_y, origin_x, msg_type_rsp, reserved);
+    header_v   := create_header(DMA_NOC_FLIT_SIZE, local_x, origin_x, msg_type_rsp, reserved);
     dma_header <= header_v;
   end process make_dma_packet;
 

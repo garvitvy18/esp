@@ -68,7 +68,7 @@ architecture rtl of esp is
 constant nocs_num : integer := 6;
 
 type noc_ctrl_matrix is array (1 to nocs_num) of std_logic_vector(CFG_TILES_NUM-1 downto 0);
-type handshake_vec is array (CFG_TILES_NUM-1 downto 0) of std_logic_vector(3 downto 0);
+type handshake_vec is array (CFG_TILES_NUM-1 downto 0) of std_logic_vector(1 downto 0);
 type boolean_vec is array (natural range <>) of boolean;
 
 constant is_io_tile : boolean_vec(0 to CFG_TILES_NUM-1) := (io_tile_id => true, others => false);
@@ -528,7 +528,7 @@ ringgen: for i in 0 to CFG_XLEN-1 generate
         this_has_token_pm => 0,
         is_tile_io        => is_io_tile(i),
         SIMULATION        => SIMULATION,
-        ROUTER_PORTS      => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i), -- tile_y(i)),
+        ROUTER_PORTS      => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i)), -- tile_y(i)),
         HAS_SYNC          => 1)
       port map (
         rst                     => rst_inv,
@@ -575,7 +575,7 @@ ringgen: for i in 0 to CFG_XLEN-1 generate
         noc2_data_void_out      => noc2_data_void_out(i),
         noc2_stop_out           => noc2_stop_out(i),
 --        noc3_data_n_in          => noc3_data_n_in(i),
-        noc3_data_s_in          => noc3_data_s_in(i),
+--        noc3_data_s_in          => noc3_data_s_in(i),
         noc3_data_w_in          => noc3_data_w_in(i),
         noc3_data_e_in          => noc3_data_e_in(i),
         noc3_data_void_in       => noc3_data_void_in(i),
@@ -676,7 +676,7 @@ ringgen: for i in 0 to CFG_XLEN-1 generate
     tile_empty_i: fpga_tile_empty
       generic map (
         SIMULATION   => SIMULATION,
-        ROUTER_PORTS => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i), -- tile_y(i)),
+        ROUTER_PORTS => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i)), -- tile_y(i)),
         HAS_SYNC     => CFG_HAS_SYNC)
       port map (
         rst                => rst_int,
@@ -746,7 +746,7 @@ ringgen: for i in 0 to CFG_XLEN-1 generate
 
       generic map (
         SIMULATION         => SIMULATION,
-        ROUTER_PORTS       => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i), -- tile_y(i)),
+        ROUTER_PORTS       => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i)), -- tile_y(i)),
         HAS_SYNC           => CFG_HAS_SYNC)
       port map (
         rst                => rst_int,
@@ -822,7 +822,7 @@ ringgen: for i in 0 to CFG_XLEN-1 generate
         this_irq_type      => tile_irq_type(i),
         this_has_l2        => tile_has_l2(i),
         this_has_token_pm  => tile_has_tdvfs(i),
-        ROUTER_PORTS       => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i), -- tile_y(i)),
+        ROUTER_PORTS       => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i)), -- tile_y(i)),
         HAS_SYNC           => CFG_HAS_SYNC)
       port map (
         rst                => rst_int,
@@ -892,7 +892,7 @@ ringgen: for i in 0 to CFG_XLEN-1 generate
       tile_io_i : fpga_tile_io
       generic map (
         SIMULATION   => SIMULATION,
-        ROUTER_PORTS => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i), -- tile_y(i)),
+        ROUTER_PORTS => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i)), -- tile_y(i)),
         HAS_SYNC     => CFG_HAS_SYNC)
       port map (
 	rst                => rst_int,
@@ -973,7 +973,7 @@ ringgen: for i in 0 to CFG_XLEN-1 generate
     mem_tile: if tile_type(i) = 4 generate
       tile_mem_i: fpga_tile_mem
       generic map (
-        ROUTER_PORTS => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i), -- tile_y(i)),
+        ROUTER_PORTS => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i)), -- tile_y(i)),
         HAS_SYNC     => CFG_HAS_SYNC)
       port map (
 	rst                => rst_int,
@@ -1043,7 +1043,7 @@ ringgen: for i in 0 to CFG_XLEN-1 generate
       tile_slm_i: fpga_tile_slm
         generic map (
           SIMULATION   => SIMULATION,
-          ROUTER_PORTS => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i), -- tile_y(i)),
+          ROUTER_PORTS => set_router_ports(CFG_FABTECH, CFG_XLEN, CFG_YLEN, tile_x(i)), -- tile_y(i)),
           HAS_SYNC     => CFG_HAS_SYNC)
         port map (
           rst                => rst_int,
