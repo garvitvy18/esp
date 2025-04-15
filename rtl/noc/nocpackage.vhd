@@ -314,7 +314,7 @@ package nocpackage is
       rst                : in  std_logic;
       rst_tile           : in  std_logic;
       CONST_local_x      : in  std_logic_vector(YX_WIDTH-1 downto 0);
-      CONST_local_y      : in  std_logic_vector(YX_WIDTH-1 downto 0);
+--      CONST_local_y      : in  std_logic_vector(YX_WIDTH-1 downto 0);
 --      noc1_data_n_in     : in  coh_noc_flit_type;
 --      noc1_data_s_in     : in  coh_noc_flit_type;
       noc1_data_w_in     : in  coh_noc_flit_type;
@@ -511,9 +511,9 @@ package nocpackage is
 
   function create_header_misc (
     constant flit_sz : integer;
-    local_y          : local_yx;
+  --  local_y          : local_yx;
     local_x          : local_yx;
-    remote_y         : local_yx;
+  --  remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_misc_type)
@@ -976,53 +976,90 @@ function create_header_mcast (
 
   function create_header_misc (
     constant flit_sz : integer;
-    local_y          : local_yx;
+    -- local_y          : local_yx;
     local_x          : local_yx;
-    remote_y         : local_yx;
+    -- remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_misc_type)
     return std_logic_vector is
     variable header                            : std_logic_vector(flit_sz - 1 downto 0);
     variable go_left, go_right, go_up, go_down : std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
+variable local_x_int   : integer;
+    variable remote_x_int  : integer;
+    variable dist_cw       : integer;
+    variable dist_ccw      : integer;
+ 
   begin  -- create_header
     header := (others => '0');
     header(flit_sz - 1 downto
            flit_sz - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
+    -- header(flit_sz - PREAMBLE_WIDTH - 1 downto
+    --        flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_y;
     header(flit_sz - PREAMBLE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_y;
+           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_x;
+    -- header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
+    --        flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := remote_y;
     header(flit_sz - PREAMBLE_WIDTH - YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := local_x;
+           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := remote_x;
     header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := remote_y;
-    header(flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH) := remote_x;
-    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
-    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC) := reserved;
+           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
+    header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC) := reserved;
 
-    if local_x < remote_x then
-      go_right := "01000";
+--    if local_x < remote_x then
+--      go_right := "01000";
+--    else
+--      go_right := "10111";
+--    end if;
+
+--    if local_x > remote_x then
+--      go_left := "00100";
+--    else
+--      go_left := "11011";
+--    end if;
+
+--    if local_y < remote_y then
+ --     header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01110" and go_left and go_right;
+--    else
+ --     header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01101" and go_left and go_right;
+--    end if;
+
+--    if local_y = remote_y and local_x = remote_x then
+ --     header(NEXT_ROUTING_WIDTH - 1 downto 0) := "10000";
+--    end if;
+ local_x_int  := to_integer(unsigned(local_x));
+  remote_x_int := to_integer(unsigned(remote_x));
+
+  -- Compute wraparound distances
+  dist_cw  := (remote_x_int - local_x_int + CFG_XLEN) mod CFG_XLEN;
+  dist_ccw := (local_x_int - remote_x_int + CFG_XLEN) mod CFG_XLEN;
+
+    -- Compute direction control signals
+  if local_x_int < remote_x_int then
+    if dist_cw > dist_ccw then
+      go_left  := "001";
+      go_right := "101";
     else
-      go_right := "10111";
+      go_right := "010";
+      go_left  := "110";
     end if;
-
-    if local_x > remote_x then
-      go_left := "00100";
+  elsif local_x_int > remote_x_int then
+    if dist_cw > dist_ccw then
+      go_left  := "001";
+      go_right := "101";
     else
-      go_left := "11011";
+      go_right := "010";
+      go_left  := "110";
     end if;
+  end if;
+  -- Set direction bits in header
+  header(NEXT_ROUTING_WIDTH - 1 downto 0) := "011" and go_left and go_right;
 
-    if local_y < remote_y then
-      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01110" and go_left and go_right;
-    else
-      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01101" and go_left and go_right;
-    end if;
-
-    if local_y = remote_y and local_x = remote_x then
-      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "10000";
-    end if;
+  -- Handle local delivery case
+  if local_x_int = remote_x_int then
+    header(NEXT_ROUTING_WIDTH - 1 downto 0) := "100";
+  end if;
 
     return header;
   end create_header_misc;

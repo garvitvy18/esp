@@ -379,7 +379,7 @@ begin  -- rtl
   -- IRQ packet
   -----------------------------------------------------------------------------
   irq_info <= conv_std_logic_vector(pirq, RESERVED_WIDTH_MISC);
-  irq_header_i <= create_header_misc(MISC_NOC_FLIT_SIZE, local_y, local_x, io_y, io_x, INTERRUPT, irq_info)(MISC_NOC_FLIT_SIZE - 1 downto 0);
+  irq_header_i <= create_header_misc(MISC_NOC_FLIT_SIZE, local_x, io_x, INTERRUPT, irq_info)(MISC_NOC_FLIT_SIZE - 1 downto 0);
   irq_header(MISC_NOC_FLIT_SIZE-1 downto MISC_NOC_FLIT_SIZE-PREAMBLE_WIDTH) <= PREAMBLE_1FLIT;
   irq_header(MISC_NOC_FLIT_SIZE-PREAMBLE_WIDTH-1 downto 0) <=
     irq_header_i(MISC_NOC_FLIT_SIZE-PREAMBLE_WIDTH-1 downto 0);

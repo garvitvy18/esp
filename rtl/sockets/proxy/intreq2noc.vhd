@@ -185,7 +185,7 @@ begin  -- rtl
       end if;
 
       header_v := (others                                                                       => '0');
-      header_v := create_header_misc(MISC_NOC_FLIT_SIZE, local_y, local_x, target_y, target_x, msg_type, reserved);
+      header_v := create_header_misc(MISC_NOC_FLIT_SIZE, local_x, target_x, msg_type, reserved);
       if GLOB_CPU_ARCH = ariane or GLOB_CPU_ARCH = ibex then
         header_v(MISC_NOC_FLIT_SIZE-1 downto MISC_NOC_FLIT_SIZE-PREAMBLE_WIDTH) := PREAMBLE_1FLIT;
       end if;

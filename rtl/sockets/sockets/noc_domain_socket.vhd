@@ -533,7 +533,7 @@ begin  -- architecture rtl
       rst                => noc_rstn_s,   -- rst
       rst_tile           => tile_rstn,   -- tile_rstn
       CONST_local_x      => this_local_x,
-      CONST_local_y      => this_local_y,
+--      CONST_local_y      => this_local_y,
 --      noc1_data_n_in     => noc1_data_n_in,
 --      noc1_data_s_in     => noc1_data_s_in,
       noc1_data_w_in     => noc1_data_w_in,
