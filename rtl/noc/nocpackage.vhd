@@ -822,18 +822,18 @@ package body nocpackage is
     header := (others => '0');
     header(flit_sz - 1 downto
            flit_sz - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
-  --  header(flit_sz - PREAMBLE_WIDTH - 1 downto
-  --         flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_y;
     header(flit_sz - PREAMBLE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_x;
-  --  header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-  --         flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := remote_y;
+           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := "0000";
     header(flit_sz - PREAMBLE_WIDTH - YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := remote_x;
+           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := local_x;
     header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
-    header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH) := reserved;
+           flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := "0000";
+    header(flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH) := remote_x;
+    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
+    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH) := reserved;
 
 --    if local_x < remote_x then
 --      go_right := "01000";
@@ -994,19 +994,18 @@ variable local_x_int   : integer;
     header := (others => '0');
     header(flit_sz - 1 downto
            flit_sz - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
-    -- header(flit_sz - PREAMBLE_WIDTH - 1 downto
-    --        flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_y;
     header(flit_sz - PREAMBLE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_x;
-    -- header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-    --        flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := remote_y;
+           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := "0000";
     header(flit_sz - PREAMBLE_WIDTH - YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := remote_x;
+           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := local_x;
     header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
-    header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC) := reserved;
-
+           flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := "0000";
+    header(flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH) := remote_x;
+    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
+    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC) := reserved;
 --    if local_x < remote_x then
 --      go_right := "01000";
 --    else

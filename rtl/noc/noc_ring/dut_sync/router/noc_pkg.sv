@@ -78,7 +78,7 @@ package noc;
     parameter int unsigned yWidth = $clog2(yMax);
 
     typedef struct packed {
-        //logic [yWidth-1:0] y;
+        logic [yWidth-1:0] y;
         logic [xWidth-1:0] x;
     } xy_t;
 
