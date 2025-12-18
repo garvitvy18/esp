@@ -809,7 +809,7 @@ begin
               noc_apbi_wirq.pwrite = '1' and noc_apbi_wirq.paddr(11 downto 0) = x"004" and
               noc_apbi_wirq.paddr(31 downto 16) = x"0c20" and irq_pwdata_hit = '1') then
 
-            header_reg := create_header_misc(MISC_NOC_FLIT_SIZE, this_local_x, dest_x,
+            header_reg := create_header_misc(MISC_NOC_FLIT_SIZE, this_local_y, this_local_x, dest_y, dest_x,
                                         INTERRUPT, (others => '0'));
             header_reg(MISC_NOC_FLIT_SIZE - 1 downto
                        MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH) := PREAMBLE_1FLIT;
@@ -1219,15 +1219,10 @@ begin
   ahbs_snd_wrreq <= ahbm_snd_wrreq;
   ahbm_snd_full  <= ahbs_snd_full;
 
-  large_bus: if ARCH_BITS /= 32 generate
-    ahbm_rcv_data_out <= narrow_to_large_flit(ahbs_rcv_data_out);
-    ahbs_snd_data_in <= large_to_narrow_flit(ahbm_snd_data_in);
-  end generate large_bus;
-
-  std_bus: if ARCH_BITS = 32 generate
-    ahbm_rcv_data_out <= ahbs_rcv_data_out;
-    ahbs_snd_data_in  <= ahbm_snd_data_in;
-  end generate std_bus;
+  -- Always translate between miscellaneous (32-bit payload) and architectural
+  -- flit widths to avoid width mismatches.
+  ahbm_rcv_data_out <= narrow_to_large_flit(ahbs_rcv_data_out);
+  ahbs_snd_data_in  <= large_to_narrow_flit(ahbm_snd_data_in);
 
   -----------------------------------------------------------------------------
   -- Monitor for DVFS. (IO tile has no dvfs)

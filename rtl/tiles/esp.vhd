@@ -70,6 +70,7 @@ constant nocs_num : integer := 6;
 type noc_ctrl_matrix is array (1 to nocs_num) of std_logic_vector(CFG_TILES_NUM-1 downto 0);
 type handshake_vec is array (CFG_TILES_NUM-1 downto 0) of std_logic_vector(1 downto 0);
 type boolean_vec is array (natural range <>) of boolean;
+type int_vec is array (natural range <>) of integer;
 
 constant is_io_tile : boolean_vec(0 to CFG_TILES_NUM-1) := (io_tile_id => true, others => false);
 
@@ -214,6 +215,56 @@ signal noc6_data_void_out_tile : std_logic_vector(CFG_TILES_NUM-1 downto 0);
 signal noc6_stop_in_tile       : std_logic_vector(CFG_TILES_NUM-1 downto 0);
 signal noc6_stop_out_tile      : std_logic_vector(CFG_TILES_NUM-1 downto 0);
 
+-- Ring ordering helpers (serpentine)
+function id_of_xy(x, y, XLEN : integer) return integer is
+begin
+  return y*XLEN + x;
+end;
+
+function build_ring_order(XLEN, YLEN : integer) return int_vec is
+  variable order : int_vec(0 to XLEN*YLEN-1);
+  variable p     : integer := 0;
+begin
+  for x in 0 to XLEN-1 loop
+    if (x mod 2) = 0 then
+      for y in 0 to YLEN-1 loop
+        order(p) := id_of_xy(x, y, XLEN);  p := p + 1;
+      end loop;
+    else
+      for y in YLEN-1 downto 0 loop
+        order(p) := id_of_xy(x, y, XLEN);  p := p + 1;
+      end loop;
+    end if;
+  end loop;
+  return order;
+end;
+
+function build_next_of(order : int_vec) return int_vec is
+  variable next_of : int_vec(0 to order'length-1);
+  variable N       : integer := order'length;
+begin
+  for i in 0 to N-1 loop
+    next_of(order(i)) := order((i+1) mod N);
+  end loop;
+  return next_of;
+end;
+
+function build_prev_of(order : int_vec) return int_vec is
+  variable prev_of : int_vec(0 to order'length-1);
+  variable N       : integer := order'length;
+  variable pm1     : integer;
+begin
+  for i in 0 to N-1 loop
+    pm1 := (i-1+N) mod N;
+    prev_of(order(i)) := order(pm1);
+  end loop;
+  return prev_of;
+end;
+
+constant RING_ORDER : int_vec(0 to CFG_TILES_NUM-1) := build_ring_order(CFG_XLEN, CFG_YLEN);
+constant RING_NEXT  : int_vec(0 to CFG_TILES_NUM-1) := build_next_of(RING_ORDER);
+constant RING_PREV  : int_vec(0 to CFG_TILES_NUM-1) := build_prev_of(RING_ORDER);
+
 
 begin
 
@@ -228,298 +279,59 @@ begin
   -----------------------------------------------------------------------------
   -- NOC CONNECTIONS
   -----------------------------------------------------------------------------
-ringgen: for i in 0 to CFG_XLEN-1 generate
+  ring_wiring: for k in 0 to CFG_TILES_NUM-1 generate
+    constant nxt : integer := RING_NEXT(k);
+    constant prv : integer := RING_PREV(k);
+  begin
 
-    -- West Port (wraparound for tile 0)
-    west_wraparound: if i = 0 generate
-      noc1_data_w_in(i) <= noc1_data_e_out(CFG_XLEN-1);
-      noc1_data_void_in(i)(0) <= noc1_data_void_out(CFG_XLEN-1)(1);
-      noc1_stop_in(i)(0) <= noc1_stop_out(CFG_XLEN-1)(1);
+    -- NoC1 ring wiring
+    noc1_data_w_in(k)         <= noc1_data_e_out(prv);
+    noc1_data_void_in(k)(0)   <= noc1_data_void_out(prv)(1);
+    noc1_stop_in(k)(0)        <= noc1_stop_out(prv)(1);
+    noc1_data_e_in(k)         <= noc1_data_w_out(nxt);
+    noc1_data_void_in(k)(1)   <= noc1_data_void_out(nxt)(0);
+    noc1_stop_in(k)(1)        <= noc1_stop_out(nxt)(0);
 
-      noc2_data_w_in(i) <= noc2_data_e_out(CFG_XLEN-1);
-      noc2_data_void_in(i)(0) <= noc2_data_void_out(CFG_XLEN-1)(1);
-      noc2_stop_in(i)(0) <= noc2_stop_out(CFG_XLEN-1)(1);
+    -- NoC2 ring wiring
+    noc2_data_w_in(k)         <= noc2_data_e_out(prv);
+    noc2_data_void_in(k)(0)   <= noc2_data_void_out(prv)(1);
+    noc2_stop_in(k)(0)        <= noc2_stop_out(prv)(1);
+    noc2_data_e_in(k)         <= noc2_data_w_out(nxt);
+    noc2_data_void_in(k)(1)   <= noc2_data_void_out(nxt)(0);
+    noc2_stop_in(k)(1)        <= noc2_stop_out(nxt)(0);
 
-      noc3_data_w_in(i) <= noc3_data_e_out(CFG_XLEN-1);
-      noc3_data_void_in(i)(0) <= noc3_data_void_out(CFG_XLEN-1)(1);
-      noc3_stop_in(i)(0) <= noc3_stop_out(CFG_XLEN-1)(1);
+    -- NoC3 ring wiring
+    noc3_data_w_in(k)         <= noc3_data_e_out(prv);
+    noc3_data_void_in(k)(0)   <= noc3_data_void_out(prv)(1);
+    noc3_stop_in(k)(0)        <= noc3_stop_out(prv)(1);
+    noc3_data_e_in(k)         <= noc3_data_w_out(nxt);
+    noc3_data_void_in(k)(1)   <= noc3_data_void_out(nxt)(0);
+    noc3_stop_in(k)(1)        <= noc3_stop_out(nxt)(0);
 
-      noc4_data_w_in(i) <= noc4_data_e_out(CFG_XLEN-1);
-      noc4_data_void_in(i)(0) <= noc4_data_void_out(CFG_XLEN-1)(1);
-      noc4_stop_in(i)(0) <= noc4_stop_out(CFG_XLEN-1)(1);
+    -- NoC4 ring wiring
+    noc4_data_w_in(k)         <= noc4_data_e_out(prv);
+    noc4_data_void_in(k)(0)   <= noc4_data_void_out(prv)(1);
+    noc4_stop_in(k)(0)        <= noc4_stop_out(prv)(1);
+    noc4_data_e_in(k)         <= noc4_data_w_out(nxt);
+    noc4_data_void_in(k)(1)   <= noc4_data_void_out(nxt)(0);
+    noc4_stop_in(k)(1)        <= noc4_stop_out(nxt)(0);
 
-      noc5_data_w_in(i) <= noc5_data_e_out(CFG_XLEN-1);
-      noc5_data_void_in(i)(0) <= noc5_data_void_out(CFG_XLEN-1)(1);
-      noc5_stop_in(i)(0) <= noc5_stop_out(CFG_XLEN-1)(1);
+    -- NoC5 ring wiring
+    noc5_data_w_in(k)         <= noc5_data_e_out(prv);
+    noc5_data_void_in(k)(0)   <= noc5_data_void_out(prv)(1);
+    noc5_stop_in(k)(0)        <= noc5_stop_out(prv)(1);
+    noc5_data_e_in(k)         <= noc5_data_w_out(nxt);
+    noc5_data_void_in(k)(1)   <= noc5_data_void_out(nxt)(0);
+    noc5_stop_in(k)(1)        <= noc5_stop_out(nxt)(0);
 
-      noc6_data_w_in(i) <= noc6_data_e_out(CFG_XLEN-1);
-      noc6_data_void_in(i)(0) <= noc6_data_void_out(CFG_XLEN-1)(1);
-      noc6_stop_in(i)(0) <= noc6_stop_out(CFG_XLEN-1)(1);
-    end generate west_wraparound;
-
-    -- West Normal (from left neighbor)
-    west_normal: if i /= 0 generate
-      noc1_data_w_in(i) <= noc1_data_e_out(i-1);
-      noc1_data_void_in(i)(0) <= noc1_data_void_out(i-1)(1);
-      noc1_stop_in(i)(0) <= noc1_stop_out(i-1)(1);
-
-      noc2_data_w_in(i) <= noc2_data_e_out(i-1);
-      noc2_data_void_in(i)(0) <= noc2_data_void_out(i-1)(1);
-      noc2_stop_in(i)(0) <= noc2_stop_out(i-1)(1);
-
-      noc3_data_w_in(i) <= noc3_data_e_out(i-1);
-      noc3_data_void_in(i)(0) <= noc3_data_void_out(i-1)(1);
-      noc3_stop_in(i)(0) <= noc3_stop_out(i-1)(1);
-
-      noc4_data_w_in(i) <= noc4_data_e_out(i-1);
-      noc4_data_void_in(i)(0) <= noc4_data_void_out(i-1)(1);
-      noc4_stop_in(i)(0) <= noc4_stop_out(i-1)(1);
-
-      noc5_data_w_in(i) <= noc5_data_e_out(i-1);
-      noc5_data_void_in(i)(0) <= noc5_data_void_out(i-1)(1);
-      noc5_stop_in(i)(0) <= noc5_stop_out(i-1)(1);
-
-      noc6_data_w_in(i) <= noc6_data_e_out(i-1);
-      noc6_data_void_in(i)(0) <= noc6_data_void_out(i-1)(1);
-      noc6_stop_in(i)(0) <= noc6_stop_out(i-1)(1);
-    end generate west_normal;
-
-    -- East Port (wraparound for last tile)
-    east_wraparound: if i = CFG_XLEN-1 generate
-      noc1_data_e_in(i) <= noc1_data_w_out(0);
-      noc1_data_void_in(i)(1) <= noc1_data_void_out(0)(0);
-      noc1_stop_in(i)(1) <= noc1_stop_out(0)(0);
-
-      noc2_data_e_in(i) <= noc2_data_w_out(0);
-      noc2_data_void_in(i)(1) <= noc2_data_void_out(0)(0);
-      noc2_stop_in(i)(1) <= noc2_stop_out(0)(0);
-
-      noc3_data_e_in(i) <= noc3_data_w_out(0);
-      noc3_data_void_in(i)(1) <= noc3_data_void_out(0)(0);
-      noc3_stop_in(i)(1) <= noc3_stop_out(0)(0);
-
-      noc4_data_e_in(i) <= noc4_data_w_out(0);
-      noc4_data_void_in(i)(1) <= noc4_data_void_out(0)(0);
-      noc4_stop_in(i)(1) <= noc4_stop_out(0)(0);
-
-      noc5_data_e_in(i) <= noc5_data_w_out(0);
-      noc5_data_void_in(i)(1) <= noc5_data_void_out(0)(0);
-      noc5_stop_in(i)(1) <= noc5_stop_out(0)(0);
-
-      noc6_data_e_in(i) <= noc6_data_w_out(0);
-      noc6_data_void_in(i)(1) <= noc6_data_void_out(0)(0);
-      noc6_stop_in(i)(1) <= noc6_stop_out(0)(0);
-    end generate east_wraparound;
-
-    -- East Normal (from right neighbor)
-    east_normal: if i /= CFG_XLEN-1 generate
-      noc1_data_e_in(i) <= noc1_data_w_out(i+1);
-      noc1_data_void_in(i)(1) <= noc1_data_void_out(i+1)(0);
-      noc1_stop_in(i)(1) <= noc1_stop_out(i+1)(0);
-
-      noc2_data_e_in(i) <= noc2_data_w_out(i+1);
-      noc2_data_void_in(i)(1) <= noc2_data_void_out(i+1)(0);
-      noc2_stop_in(i)(1) <= noc2_stop_out(i+1)(0);
-
-      noc3_data_e_in(i) <= noc3_data_w_out(i+1);
-      noc3_data_void_in(i)(1) <= noc3_data_void_out(i+1)(0);
-      noc3_stop_in(i)(1) <= noc3_stop_out(i+1)(0);
-
-      noc4_data_e_in(i) <= noc4_data_w_out(i+1);
-      noc4_data_void_in(i)(1) <= noc4_data_void_out(i+1)(0);
-      noc4_stop_in(i)(1) <= noc4_stop_out(i+1)(0);
-
-      noc5_data_e_in(i) <= noc5_data_w_out(i+1);
-      noc5_data_void_in(i)(1) <= noc5_data_void_out(i+1)(0);
-      noc5_stop_in(i)(1) <= noc5_stop_out(i+1)(0);
-
-      noc6_data_e_in(i) <= noc6_data_w_out(i+1);
-      noc6_data_void_in(i)(1) <= noc6_data_void_out(i+1)(0);
-      noc6_stop_in(i)(1) <= noc6_stop_out(i+1)(0);
-    end generate east_normal;
-
-  end generate ringgen;
---  meshgen_y: for i in 0 to CFG_YLEN-1 generate
---    meshgen_x: for j in 0 to CFG_XLEN-1 generate
---
---      y_0: if (i=0) generate
---        -- North port is unconnected
---        noc1_data_n_in(i*CFG_XLEN + j) <= (others => '0');
---        noc1_data_void_in(i*CFG_XLEN + j)(0) <= '1';
---        noc1_stop_in(i*CFG_XLEN + j)(0) <= '0';
---        noc2_data_n_in(i*CFG_XLEN + j) <= (others => '0');
---        noc2_data_void_in(i*CFG_XLEN + j)(0) <= '1';
---        noc2_stop_in(i*CFG_XLEN + j)(0) <= '0';
---        noc3_data_n_in(i*CFG_XLEN + j) <= (others => '0');
---        noc3_data_void_in(i*CFG_XLEN + j)(0) <= '1';
---        noc3_stop_in(i*CFG_XLEN + j)(0) <= '0';
---        noc4_data_n_in(i*CFG_XLEN + j) <= (others => '0');
---        noc4_data_void_in(i*CFG_XLEN + j)(0) <= '1';
---        noc4_stop_in(i*CFG_XLEN + j)(0) <= '0';
---        noc5_data_n_in(i*CFG_XLEN + j) <= (others => '0');
---        noc5_data_void_in(i*CFG_XLEN + j)(0) <= '1';
---        noc5_stop_in(i*CFG_XLEN + j)(0) <= '0';
---        noc6_data_n_in(i*CFG_XLEN + j) <= (others => '0');
---        noc6_data_void_in(i*CFG_XLEN + j)(0) <= '1';
---        noc6_stop_in(i*CFG_XLEN + j)(0) <= '0';
---      end generate y_0;
---
---      y_non_0: if (i /= 0) generate
---        -- North port is connected
---        noc1_data_n_in(i*CFG_XLEN + j)       <= noc1_data_s_out((i-1)*CFG_XLEN + j);
---        noc1_data_void_in(i*CFG_XLEN + j)(0) <= noc1_data_void_out((i-1)*CFG_XLEN + j)(1);
---        noc1_stop_in(i*CFG_XLEN + j)(0)      <= noc1_stop_out((i-1)*CFG_XLEN + j)(1);
---        noc2_data_n_in(i*CFG_XLEN + j)       <= noc2_data_s_out((i-1)*CFG_XLEN + j);
---        noc2_data_void_in(i*CFG_XLEN + j)(0) <= noc2_data_void_out((i-1)*CFG_XLEN + j)(1);
---        noc2_stop_in(i*CFG_XLEN + j)(0)      <= noc2_stop_out((i-1)*CFG_XLEN + j)(1);
---        noc3_data_n_in(i*CFG_XLEN + j)       <= noc3_data_s_out((i-1)*CFG_XLEN + j);
---        noc3_data_void_in(i*CFG_XLEN + j)(0) <= noc3_data_void_out((i-1)*CFG_XLEN + j)(1);
---        noc3_stop_in(i*CFG_XLEN + j)(0)      <= noc3_stop_out((i-1)*CFG_XLEN + j)(1);
---        noc4_data_n_in(i*CFG_XLEN + j)       <= noc4_data_s_out((i-1)*CFG_XLEN + j);
---        noc4_data_void_in(i*CFG_XLEN + j)(0) <= noc4_data_void_out((i-1)*CFG_XLEN + j)(1);
---        noc4_stop_in(i*CFG_XLEN + j)(0)      <= noc4_stop_out((i-1)*CFG_XLEN + j)(1);
---        noc5_data_n_in(i*CFG_XLEN + j)       <= noc5_data_s_out((i-1)*CFG_XLEN + j);
---        noc5_data_void_in(i*CFG_XLEN + j)(0) <= noc5_data_void_out((i-1)*CFG_XLEN + j)(1);
---        noc5_stop_in(i*CFG_XLEN + j)(0)      <= noc5_stop_out((i-1)*CFG_XLEN + j)(1);
---        noc6_data_n_in(i*CFG_XLEN + j)       <= noc6_data_s_out((i-1)*CFG_XLEN + j);
---        noc6_data_void_in(i*CFG_XLEN + j)(0) <= noc6_data_void_out((i-1)*CFG_XLEN + j)(1);
---        noc6_stop_in(i*CFG_XLEN + j)(0)      <= noc6_stop_out((i-1)*CFG_XLEN + j)(1);
---      end generate y_non_0;
---
---      y_YLEN: if (i=CFG_YLEN-1) generate
---        -- South port is unconnected
---        noc1_data_s_in(i*CFG_XLEN + j) <= (others => '0');
---        noc1_data_void_in(i*CFG_XLEN + j)(1) <= '1';
---        noc1_stop_in(i*CFG_XLEN + j)(1) <= '0';
---        noc2_data_s_in(i*CFG_XLEN + j) <= (others => '0');
---        noc2_data_void_in(i*CFG_XLEN + j)(1) <= '1';
---        noc2_stop_in(i*CFG_XLEN + j)(1) <= '0';
---        noc3_data_s_in(i*CFG_XLEN + j) <= (others => '0');
---        noc3_data_void_in(i*CFG_XLEN + j)(1) <= '1';
---        noc3_stop_in(i*CFG_XLEN + j)(1) <= '0';
---        noc4_data_s_in(i*CFG_XLEN + j) <= (others => '0');
---        noc4_data_void_in(i*CFG_XLEN + j)(1) <= '1';
---        noc4_stop_in(i*CFG_XLEN + j)(1) <= '0';
---        noc5_data_s_in(i*CFG_XLEN + j) <= (others => '0');
---        noc5_data_void_in(i*CFG_XLEN + j)(1) <= '1';
---        noc5_stop_in(i*CFG_XLEN + j)(1) <= '0';
---        noc6_data_s_in(i*CFG_XLEN + j) <= (others => '0');
---        noc6_data_void_in(i*CFG_XLEN + j)(1) <= '1';
---        noc6_stop_in(i*CFG_XLEN + j)(1) <= '0';
---      end generate y_YLEN;
---
---      y_non_YLEN: if (i /= CFG_YLEN-1) generate
---        -- south port is connected
---        noc1_data_s_in(i*CFG_XLEN + j)       <= noc1_data_n_out((i+1)*CFG_XLEN + j);
---        noc1_data_void_in(i*CFG_XLEN + j)(1) <= noc1_data_void_out((i+1)*CFG_XLEN + j)(0);
---        noc1_stop_in(i*CFG_XLEN + j)(1)      <= noc1_stop_out((i+1)*CFG_XLEN + j)(0);
---        noc2_data_s_in(i*CFG_XLEN + j)       <= noc2_data_n_out((i+1)*CFG_XLEN + j);
---        noc2_data_void_in(i*CFG_XLEN + j)(1) <= noc2_data_void_out((i+1)*CFG_XLEN + j)(0);
---        noc2_stop_in(i*CFG_XLEN + j)(1)      <= noc2_stop_out((i+1)*CFG_XLEN + j)(0);
---        noc3_data_s_in(i*CFG_XLEN + j)       <= noc3_data_n_out((i+1)*CFG_XLEN + j);
---        noc3_data_void_in(i*CFG_XLEN + j)(1) <= noc3_data_void_out((i+1)*CFG_XLEN + j)(0);
---        noc3_stop_in(i*CFG_XLEN + j)(1)      <= noc3_stop_out((i+1)*CFG_XLEN + j)(0);
---        noc4_data_s_in(i*CFG_XLEN + j)       <= noc4_data_n_out((i+1)*CFG_XLEN + j);
---        noc4_data_void_in(i*CFG_XLEN + j)(1) <= noc4_data_void_out((i+1)*CFG_XLEN + j)(0);
---        noc4_stop_in(i*CFG_XLEN + j)(1)      <= noc4_stop_out((i+1)*CFG_XLEN + j)(0);
---        noc5_data_s_in(i*CFG_XLEN + j)       <= noc5_data_n_out((i+1)*CFG_XLEN + j);
---        noc5_data_void_in(i*CFG_XLEN + j)(1) <= noc5_data_void_out((i+1)*CFG_XLEN + j)(0);
---        noc5_stop_in(i*CFG_XLEN + j)(1)      <= noc5_stop_out((i+1)*CFG_XLEN + j)(0);
---        noc6_data_s_in(i*CFG_XLEN + j)       <= noc6_data_n_out((i+1)*CFG_XLEN + j);
---        noc6_data_void_in(i*CFG_XLEN + j)(1) <= noc6_data_void_out((i+1)*CFG_XLEN + j)(0);
---        noc6_stop_in(i*CFG_XLEN + j)(1)      <= noc6_stop_out((i+1)*CFG_XLEN + j)(0);
---      end generate y_non_YLEN;
---
---      x_0: if (j=0) generate
---        -- West port is unconnected
---        noc1_data_w_in(i*CFG_XLEN + j) <= (others => '0');
---        noc1_data_void_in(i*CFG_XLEN + j)(2) <= '1';
---        noc1_stop_in(i*CFG_XLEN + j)(2) <= '0';
---        noc2_data_w_in(i*CFG_XLEN + j) <= (others => '0');
---        noc2_data_void_in(i*CFG_XLEN + j)(2) <= '1';
---        noc2_stop_in(i*CFG_XLEN + j)(2) <= '0';
---        noc3_data_w_in(i*CFG_XLEN + j) <= (others => '0');
---        noc3_data_void_in(i*CFG_XLEN + j)(2) <= '1';
---        noc3_stop_in(i*CFG_XLEN + j)(2) <= '0';
---        noc4_data_w_in(i*CFG_XLEN + j) <= (others => '0');
---        noc4_data_void_in(i*CFG_XLEN + j)(2) <= '1';
---        noc4_stop_in(i*CFG_XLEN + j)(2) <= '0';
---        noc5_data_w_in(i*CFG_XLEN + j) <= (others => '0');
---        noc5_data_void_in(i*CFG_XLEN + j)(2) <= '1';
---        noc5_stop_in(i*CFG_XLEN + j)(2) <= '0';
---        noc6_data_w_in(i*CFG_XLEN + j) <= (others => '0');
---        noc6_data_void_in(i*CFG_XLEN + j)(2) <= '1';
---        noc6_stop_in(i*CFG_XLEN + j)(2) <= '0';
---      end generate x_0;
---
---      x_non_0: if (j /= 0) generate
---        -- West port is connected
---        noc1_data_w_in(i*CFG_XLEN + j)       <= noc1_data_e_out(i*CFG_XLEN + j - 1);
---        noc1_data_void_in(i*CFG_XLEN + j)(2) <= noc1_data_void_out(i*CFG_XLEN + j - 1)(3);
---        noc1_stop_in(i*CFG_XLEN + j)(2)      <= noc1_stop_out(i*CFG_XLEN + j - 1)(3);
---        noc2_data_w_in(i*CFG_XLEN + j)       <= noc2_data_e_out(i*CFG_XLEN + j - 1);
---        noc2_data_void_in(i*CFG_XLEN + j)(2) <= noc2_data_void_out(i*CFG_XLEN + j - 1)(3);
---        noc2_stop_in(i*CFG_XLEN + j)(2)      <= noc2_stop_out(i*CFG_XLEN + j - 1)(3);
---        noc3_data_w_in(i*CFG_XLEN + j)       <= noc3_data_e_out(i*CFG_XLEN + j - 1);
---        noc3_data_void_in(i*CFG_XLEN + j)(2) <= noc3_data_void_out(i*CFG_XLEN + j - 1)(3);
---        noc3_stop_in(i*CFG_XLEN + j)(2)      <= noc3_stop_out(i*CFG_XLEN + j - 1)(3);
---        noc4_data_w_in(i*CFG_XLEN + j)       <= noc4_data_e_out(i*CFG_XLEN + j - 1);
---        noc4_data_void_in(i*CFG_XLEN + j)(2) <= noc4_data_void_out(i*CFG_XLEN + j - 1)(3);
---        noc4_stop_in(i*CFG_XLEN + j)(2)      <= noc4_stop_out(i*CFG_XLEN + j - 1)(3);
---        noc5_data_w_in(i*CFG_XLEN + j)       <= noc5_data_e_out(i*CFG_XLEN + j - 1);
---        noc5_data_void_in(i*CFG_XLEN + j)(2) <= noc5_data_void_out(i*CFG_XLEN + j - 1)(3);
---        noc5_stop_in(i*CFG_XLEN + j)(2)      <= noc5_stop_out(i*CFG_XLEN + j - 1)(3);
---        noc6_data_w_in(i*CFG_XLEN + j)       <= noc6_data_e_out(i*CFG_XLEN + j - 1);
---        noc6_data_void_in(i*CFG_XLEN + j)(2) <= noc6_data_void_out(i*CFG_XLEN + j - 1)(3);
---        noc6_stop_in(i*CFG_XLEN + j)(2)      <= noc6_stop_out(i*CFG_XLEN + j - 1)(3);
---      end generate x_non_0;
---
---      x_XLEN: if (j=CFG_XLEN-1) generate
---        -- East port is unconnected
---        noc1_data_e_in(i*CFG_XLEN + j) <= (others => '0');
---        noc1_data_void_in(i*CFG_XLEN + j)(3) <= '1';
---        noc1_stop_in(i*CFG_XLEN + j)(3) <= '0';
---        noc2_data_e_in(i*CFG_XLEN + j) <= (others => '0');
---        noc2_data_void_in(i*CFG_XLEN + j)(3) <= '1';
---        noc2_stop_in(i*CFG_XLEN + j)(3) <= '0';
---        noc3_data_e_in(i*CFG_XLEN + j) <= (others => '0');
---        noc3_data_void_in(i*CFG_XLEN + j)(3) <= '1';
---        noc3_stop_in(i*CFG_XLEN + j)(3) <= '0';
---        noc4_data_e_in(i*CFG_XLEN + j) <= (others => '0');
---        noc4_data_void_in(i*CFG_XLEN + j)(3) <= '1';
---        noc4_stop_in(i*CFG_XLEN + j)(3) <= '0';
---        noc5_data_e_in(i*CFG_XLEN + j) <= (others => '0');
---        noc5_data_void_in(i*CFG_XLEN + j)(3) <= '1';
---        noc5_stop_in(i*CFG_XLEN + j)(3) <= '0';
---        noc6_data_e_in(i*CFG_XLEN + j) <= (others => '0');
---        noc6_data_void_in(i*CFG_XLEN + j)(3) <= '1';
---        noc6_stop_in(i*CFG_XLEN + j)(3) <= '0';
---      end generate x_XLEN;
---
---      x_non_XLEN: if (j /= CFG_XLEN-1) generate
---        -- East port is connected
---        noc1_data_e_in(i*CFG_XLEN + j)         <= noc1_data_w_out(i*CFG_XLEN + j + 1);
---        noc1_data_void_in(i*CFG_XLEN + j)(3)   <= noc1_data_void_out(i*CFG_XLEN + j + 1)(2);
---        noc1_stop_in(i*CFG_XLEN + j)(3)        <= noc1_stop_out(i*CFG_XLEN + j + 1)(2);
---        noc2_data_e_in(i*CFG_XLEN + j)         <= noc2_data_w_out(i*CFG_XLEN + j + 1);
---        noc2_data_void_in(i*CFG_XLEN + j)(3)   <= noc2_data_void_out(i*CFG_XLEN + j + 1)(2);
---        noc2_stop_in(i*CFG_XLEN + j)(3)        <= noc2_stop_out(i*CFG_XLEN + j + 1)(2);
---        noc3_data_e_in(i*CFG_XLEN + j)         <= noc3_data_w_out(i*CFG_XLEN + j + 1);
---        noc3_data_void_in(i*CFG_XLEN + j)(3)   <= noc3_data_void_out(i*CFG_XLEN + j + 1)(2);
---        noc3_stop_in(i*CFG_XLEN + j)(3)        <= noc3_stop_out(i*CFG_XLEN + j + 1)(2);
---        noc4_data_e_in(i*CFG_XLEN + j)         <= noc4_data_w_out(i*CFG_XLEN + j + 1);
---        noc4_data_void_in(i*CFG_XLEN + j)(3)   <= noc4_data_void_out(i*CFG_XLEN + j + 1)(2);
---        noc4_stop_in(i*CFG_XLEN + j)(3)        <= noc4_stop_out(i*CFG_XLEN + j + 1)(2);
---        noc5_data_e_in(i*CFG_XLEN + j)         <= noc5_data_w_out(i*CFG_XLEN + j + 1);
---        noc5_data_void_in(i*CFG_XLEN + j)(3)   <= noc5_data_void_out(i*CFG_XLEN + j + 1)(2);
---        noc5_stop_in(i*CFG_XLEN + j)(3)        <= noc5_stop_out(i*CFG_XLEN + j + 1)(2);
---        noc6_data_e_in(i*CFG_XLEN + j)         <= noc6_data_w_out(i*CFG_XLEN + j + 1);
---        noc6_data_void_in(i*CFG_XLEN + j)(3)   <= noc6_data_void_out(i*CFG_XLEN + j + 1)(2);
---        noc6_stop_in(i*CFG_XLEN + j)(3)        <= noc6_stop_out(i*CFG_XLEN + j + 1)(2);
---      end generate x_non_XLEN;
---
---    end generate meshgen_x;
---  end generate meshgen_y;
+    -- NoC6 ring wiring
+    noc6_data_w_in(k)         <= noc6_data_e_out(prv);
+    noc6_data_void_in(k)(0)   <= noc6_data_void_out(prv)(1);
+    noc6_stop_in(k)(0)        <= noc6_stop_out(prv)(1);
+    noc6_data_e_in(k)         <= noc6_data_w_out(nxt);
+    noc6_data_void_in(k)(1)   <= noc6_data_void_out(nxt)(0);
+    noc6_stop_in(k)(1)        <= noc6_stop_out(nxt)(0);
+  end generate;
 
 
   router_gen : for i in 0 to CFG_TILES_NUM - 1 generate
@@ -1144,4 +956,4 @@ ringgen: for i in 0 to CFG_XLEN-1 generate
 
   mon_dvfs <= mon_dvfs_out;
 
-end;
+end rtl;

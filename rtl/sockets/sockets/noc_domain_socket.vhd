@@ -187,6 +187,8 @@ architecture rtl of noc_domain_socket is
   -- Tile parameters
   signal this_local_y : local_yx;
   signal this_local_x : local_yx;
+  signal this_ring_id : local_yx;
+  signal ring_id_int  : integer range 0 to CFG_TILES_NUM - 1;
 
   -- Token-based power management config and status
   signal pm_config : pm_config_type;
@@ -532,7 +534,7 @@ begin  -- architecture rtl
       clk_tile           => tile_clk,    -- acc_clk
       rst                => noc_rstn_s,   -- rst
       rst_tile           => tile_rstn,   -- tile_rstn
-      CONST_local_x      => this_local_x,
+      CONST_local_x      => this_ring_id,
 --      CONST_local_y      => this_local_y,
 --      noc1_data_n_in     => noc1_data_n_in,
 --      noc1_data_s_in     => noc1_data_s_in,
@@ -715,6 +717,10 @@ begin  -- architecture rtl
 
   this_local_y <= tile_y(tile_id);
   this_local_x <= tile_x(tile_id);
+  ring_id_int  <= (to_integer(unsigned(tile_x(tile_id))) * CFG_YLEN) +
+                  ((to_integer(unsigned(tile_x(tile_id))) mod 2) * (CFG_YLEN - 1 - to_integer(unsigned(tile_y(tile_id))))) +
+                  (((to_integer(unsigned(tile_x(tile_id))) + 1) mod 2) * to_integer(unsigned(tile_y(tile_id))));
+  this_ring_id <= conv_std_logic_vector(ring_id_int, YX_WIDTH);
 
   dco_clk_delay_sel <= tile_config_int(ESP_CSR_DCO_CFG_MSB downto ESP_CSR_DCO_CFG_MSB - 11);
   dco_freq_sel <= tile_config_int(ESP_CSR_DCO_CFG_MSB - DCO_CFG_LPDDR_CTRL_BITS - 0  downto ESP_CSR_DCO_CFG_MSB - DCO_CFG_LPDDR_CTRL_BITS - 0  - 1);

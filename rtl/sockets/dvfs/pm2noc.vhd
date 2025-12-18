@@ -214,7 +214,8 @@ begin
 
             noc5_data_void_in <= '0';
             noc5_input_port <= create_header_misc(MISC_NOC_FLIT_SIZE,
-                                              local_x,  dest_x,
+                                              local_y, local_x,
+                                              dest_y,  dest_x,
                                              DVFS_MSG, (others => '0'));
           end if;
         end if;

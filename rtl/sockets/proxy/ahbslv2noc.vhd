@@ -224,8 +224,8 @@ begin  -- rtl
     reserved(3 downto 0) := ahbsi.hprot;
     header_v := (others => '0');
     header_narrow_v := (others => '0');
-    header_v := create_header(this_noc_flit_size, local_x, mem_x, msg_type, reserved);
-    header_narrow_v := create_header_misc(MISC_NOC_FLIT_SIZE, local_x, mem_x, msg_type, reserved(RESERVED_WIDTH_MISC-1 downto 0));
+    header_v := create_header(this_noc_flit_size, local_y, local_x, mem_y, mem_x, msg_type, reserved);
+    header_narrow_v := create_header_misc(MISC_NOC_FLIT_SIZE, local_y, local_x, mem_y, mem_x, msg_type, reserved(RESERVED_WIDTH_MISC-1 downto 0));
     header <= header_v;
     header_narrow <= header_narrow_v;
   end process make_packet;

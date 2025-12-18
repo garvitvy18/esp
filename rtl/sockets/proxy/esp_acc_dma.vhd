@@ -379,7 +379,7 @@ begin  -- rtl
   -- IRQ packet
   -----------------------------------------------------------------------------
   irq_info <= conv_std_logic_vector(pirq, RESERVED_WIDTH_MISC);
-  irq_header_i <= create_header_misc(MISC_NOC_FLIT_SIZE, local_x, io_x, INTERRUPT, irq_info)(MISC_NOC_FLIT_SIZE - 1 downto 0);
+  irq_header_i <= create_header_misc(MISC_NOC_FLIT_SIZE, local_y, local_x, io_y, io_x, INTERRUPT, irq_info)(MISC_NOC_FLIT_SIZE - 1 downto 0);
   irq_header(MISC_NOC_FLIT_SIZE-1 downto MISC_NOC_FLIT_SIZE-PREAMBLE_WIDTH) <= PREAMBLE_1FLIT;
   irq_header(MISC_NOC_FLIT_SIZE-PREAMBLE_WIDTH-1 downto 0) <=
     irq_header_i(MISC_NOC_FLIT_SIZE-PREAMBLE_WIDTH-1 downto 0);
@@ -588,7 +588,7 @@ begin  -- rtl
     end if;
 
     if msg_type = REQ_P2P then
-      p2p_header_v := create_header(DMA_NOC_FLIT_SIZE, local_x, p2p_src_x, msg_type, hprot);
+      p2p_header_v := create_header(DMA_NOC_FLIT_SIZE, local_y, local_x, p2p_src_y, p2p_src_x, msg_type, hprot);
       p2p_header_v(DMA_NOC_FLIT_SIZE-1 downto DMA_NOC_FLIT_SIZE-PREAMBLE_WIDTH) := PREAMBLE_HEADER;
     else
       p2p_header_v := create_header_mcast(DMA_NOC_FLIT_SIZE, local_y, local_x,
@@ -598,7 +598,7 @@ begin  -- rtl
     end if;
 
     header_v := (others => '0');
-    header_v := create_header(DMA_NOC_FLIT_SIZE, local_x, mem_x, msg_type, hprot);
+    header_v := create_header(DMA_NOC_FLIT_SIZE, local_y, local_x, mem_y, mem_x, msg_type, hprot);
     if is_p2p = '0' then
       header <= header_v;
     else

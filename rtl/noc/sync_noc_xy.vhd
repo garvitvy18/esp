@@ -58,7 +58,7 @@ architecture ring of sync_noc_xy is
     port (
       clk           : in  std_logic;
       rst           : in  std_logic;
-      CONST_localx  : in  std_logic_vector(YX_WIDTH-1 downto 0);
+      CONST_localx  : in  std_logic_vector(2 downto 0);
 --      CONST_localy  : in  std_logic_vector(YX_WIDTH-1 downto 0);
 --      data_n_in     : in  std_logic_vector(width-1 downto 0);
 --      data_s_in     : in  std_logic_vector(width-1 downto 0);
@@ -129,7 +129,7 @@ architecture ring of sync_noc_xy is
       port map (
           clk           => clk,
           rst           => rst,
-          CONST_localx  => CONST_local_x,
+          CONST_localx  => CONST_local_x(2 downto 0),
        --   CONST_localy  => CONST_local_y,
        --   data_n_in     => data_n_in,
        --   data_s_in     => data_s_in,
@@ -216,4 +216,3 @@ architecture ring of sync_noc_xy is
   end generate inferred_async_fifos_gen;
 
 end ring;
-

@@ -208,8 +208,11 @@ module lookahead_router #(
                         saved_routing_request[g_i] <= fifo_head[g_i].header.routing;
                     end
                 end
+		   /* $display("%0t [LOOK] port %0d got HEAD with dest.x = %0d  (raw=0x%h)",
+             $time, g_i,
+             fifo_head[g_i].header.info.destination.x,
+             fifo_head[g_i].flit); */
             end
-
             assign final_routing_request[g_i] = in_valid_head[g_i] ? fifo_head[g_i].header.routing :
                                             saved_routing_request[g_i];
 
@@ -489,6 +492,30 @@ module lookahead_router #(
         a_credits_in_range :
         assert property (@(posedge clk) disable iff (rst) credits[g_i] <= QUEUE_SIZE)
         else $error("Fail: a_enhanc_routing_configuration_onehot");
+    end
+
+    // Debug helper: report which port triggers self-request (simulation only)
+    always_ff @(posedge clk) begin
+        if (!rst) begin
+            for (int p = 0; p < 3; p++) begin
+                if (in_valid_head[p] && fifo_head[p].header.routing == 3'b011) begin
+                    $display("%0t [LOOK_SAN] port %0d routing=011 | pos=%0d | src=%0d | dst=%0d | msg=%0d | preamble=%b | flit=%h",
+                             $time, p, position.x,
+                             fifo_head[p].header.info.source.x,
+                             fifo_head[p].header.info.destination.x,
+                             fifo_head[p].header.info.message,
+                             fifo_head[p].header.preamble, fifo_head[p].flit);
+                end
+                if (final_routing_request[p][p]) begin
+                    $display("%0t [LOOK_DBG] self-request on port %0d | routing=%b | pos=%0d | src=%0d | dst=%0d | msg=%0d | preamble=%b | flit=%h",
+                             $time, p, final_routing_request[p], position.x,
+                             fifo_head[p].header.info.source.x,
+                             fifo_head[p].header.info.destination.x,
+                             fifo_head[p].header.info.message,
+                             fifo_head[p].header.preamble, fifo_head[p].flit);
+                end
+            end
+        end
     end
 
     // pragma coverage on

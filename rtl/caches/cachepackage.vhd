@@ -531,7 +531,7 @@ package body cachepackage is
       noc_msg := '0' & coh_msg;
       reserved := word_mask & std_logic_vector(resize(unsigned(hprot), RESERVED_WIDTH - WORDS_PER_LINE));
     end if;
-    header := create_header(COH_NOC_FLIT_SIZE, local_x, dest_x, '0' & coh_msg, reserved); -- create_header(COH_NOC_FLIT_SIZE, local_y, local_x, dest_y, dest_x, noc_msg, reserved);
+    header := create_header(COH_NOC_FLIT_SIZE, local_y, local_x, dest_y, dest_x, '0' & coh_msg, reserved);
 
     return header;
 
@@ -586,7 +586,7 @@ package body cachepackage is
     else
       reserved := word_mask & std_logic_vector(resize(unsigned(src_id), RESERVED_WIDTH - WORDS_PER_LINE));
     end if;
-    header := create_header(COH_NOC_FLIT_SIZE, local_x, dest_x, '0' & coh_msg, reserved); -- create_header(COH_NOC_FLIT_SIZE, local_y, local_x, dest_y, dest_x, '0' & coh_msg, reserved);
+    header := create_header(COH_NOC_FLIT_SIZE, local_y, local_x, dest_y, dest_x, '0' & coh_msg, reserved);
 
     return header;
 

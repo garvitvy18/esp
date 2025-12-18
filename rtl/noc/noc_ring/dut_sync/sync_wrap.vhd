@@ -10,8 +10,8 @@ use work.nocpackage.all;
 
 entity sync_wrap is
   generic (
-    XLEN      : integer := 4;
-    YLEN      : integer := 0;
+    XLEN      : integer := 2;
+    YLEN      : integer := 2;
     TILES_NUM : integer := 4;
     flit_size : integer := 34);
 

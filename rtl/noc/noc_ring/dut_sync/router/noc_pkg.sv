@@ -7,8 +7,8 @@ package noc;
     //
 
     // Coordinates
-    parameter int unsigned xMax = 16;
-    parameter int unsigned yMax = 16;
+    parameter int unsigned xMax = 8;
+    parameter int unsigned yMax = 8;
 
     // Message Type
     parameter int unsigned messageTypeWidth = 5;
@@ -78,7 +78,7 @@ package noc;
     parameter int unsigned yWidth = $clog2(yMax);
 
     typedef struct packed {
-        logic [yWidth-1:0] y;
+//        logic [yWidth-1:0] y;
         logic [xWidth-1:0] x;
     } xy_t;
 

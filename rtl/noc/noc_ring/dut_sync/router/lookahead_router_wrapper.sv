@@ -1,4 +1,4 @@
-module lookahead_router_wrapper_ring #(
+module lookahead_router_wrapper #(
     parameter bit FlowControl = noc::kFlowControlAckNack,
     parameter int unsigned Width = 32,
     parameter bit [2:0] Ports = noc::AllPorts,

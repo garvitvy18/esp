@@ -47,7 +47,7 @@ entity router is
     clk : in std_logic;
     rst : in std_logic;
 
-    CONST_localx : in std_logic_vector(YX_WIDTH-1 downto 0);
+    CONST_localx : in std_logic_vector(2 downto 0);
    -- CONST_localy : in std_logic_vector(YX_WIDTH-1 downto 0);
 
    -- data_n_in : in std_logic_vector(width-1 downto 0);
@@ -73,7 +73,7 @@ end router;
 
 architecture behavior of router is
 
-  component lookahead_router_wrapper_ring
+  component lookahead_router_wrapper
     generic(
       FlowControl : std_logic;
       Width       : integer;
@@ -85,7 +85,7 @@ architecture behavior of router is
       clk : in std_logic;
       rst : in std_logic;
 
-      CONST_localx : in std_logic_vector(YX_WIDTH-1 downto 0);
+      CONST_localx : in std_logic_vector(2 downto 0);
       --CONST_localy : in std_logic_vector(YX_WIDTH-1 downto 0);
 
       --data_n_in : in std_logic_vector(width-1 downto 0);
@@ -109,7 +109,7 @@ architecture behavior of router is
 
 begin
 
-  lookahead_router_wrapper_i: lookahead_router_wrapper_ring
+  lookahead_router_wrapper_i: lookahead_router_wrapper
     generic map (
       FlowControl => to_std_logic(flow_control),
       Width       => width,

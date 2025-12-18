@@ -743,6 +743,30 @@ module lookahead_router_multicast #(
         else $error("Fail: a_enhanc_routing_configuration_onehot");
     end
 
+    // Debug helper: surface illegal 3'b011 routing and self-requests (simulation only)
+    always_ff @(posedge clk) begin
+        if (!rst) begin
+            for (int p = 0; p < 3; p++) begin
+                if (in_valid_head[p] && fifo_head[p].header.routing == 3'b011) begin
+                    $display("%0t [LOOK_SAN] port %0d routing=011 | pos=%0d | src=%0d | dst=%0d | msg=%0d | preamble=%b | flit=%h",
+                             $time, p, position.x,
+                             fifo_head[p].header.info.source.x,
+                             fifo_head[p].header.info.destination.x,
+                             fifo_head[p].header.info.message,
+                             fifo_head[p].header.preamble, fifo_head[p].flit);
+                end
+                if (final_routing_request[p][p]) begin
+                    $display("%0t [LOOK_DBG] self-request on port %0d | routing=%b | pos=%0d | src=%0d | dst=%0d | msg=%0d | preamble=%b | flit=%h",
+                             $time, p, final_routing_request[p], position.x,
+                             fifo_head[p].header.info.source.x,
+                             fifo_head[p].header.info.destination.x,
+                             fifo_head[p].header.info.message,
+                             fifo_head[p].header.preamble, fifo_head[p].flit);
+                end
+            end
+        end
+    end
+
     // pragma coverage on
     //VCS coverage on
 `endif  // ~SYNTHESIS

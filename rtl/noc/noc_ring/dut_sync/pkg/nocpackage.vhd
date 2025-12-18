@@ -54,15 +54,21 @@ package nocpackage is
 --   constant HEADER_ROUTE_N : natural := 0;
 
   constant PREAMBLE_WIDTH      : natural := 2;
-  constant YX_WIDTH            : natural := 5;
+  -- 3-bit coordinates/IDs (matches standalone ring testbench)
+  constant YX_WIDTH            : natural := 3;
+  -- Keep message width consistent with standalone ring NoC generator
   constant MSG_TYPE_WIDTH      : natural := 3;
-  constant RESERVED_WIDTH      : natural := 4;
-  constant NEXT_ROUTING_WIDTH  : natural := 5;
-  constant NOC_FLIT_SIZE       : natural := PREAMBLE_WIDTH+
-                                            4*YX_WIDTH+
-                                            MSG_TYPE_WIDTH+
-                                            RESERVED_WIDTH+
-                                            NEXT_ROUTING_WIDTH + 32;
+  constant NEXT_ROUTING_WIDTH  : natural := 3;
+  -- Layout (MSB->LSB): preamble | src_id | dst_id | msg | reserved | local_y | local_x | routing
+  constant RESERVED_WIDTH      : natural := 14;
+  constant NOC_FLIT_SIZE       : natural := PREAMBLE_WIDTH +
+                                            2*YX_WIDTH +      -- src/dst ids
+                                            MSG_TYPE_WIDTH +
+                                            RESERVED_WIDTH +
+                                            2*YX_WIDTH +      -- local_y/local_x
+                                            NEXT_ROUTING_WIDTH;
+  -- Total tiles in the ring (2x2 -> 4); keep configurable here if topology changes
+  constant RING_LEN            : natural := 4;
 
   subtype local_yx is std_logic_vector(2 downto 0);
   subtype noc_preamble_type is std_logic_vector(PREAMBLE_WIDTH-1 downto 0);
@@ -282,10 +288,17 @@ package nocpackage is
     msg : noc_msg_type)
     return boolean;
 
+  function idx_to_x (i : integer) return local_yx;
+  function idx_to_y (i : integer) return local_yx;
+  function get_hamiltonian_index (
+    local_y : local_yx;
+    local_x : local_yx)
+    return integer;
+
   function create_header (
-    -- local_y           : local_yx;
+    local_y           : local_yx;
     local_x           : local_yx;
-    -- remote_y          : local_yx;
+    remote_y          : local_yx;
     remote_x          : local_yx;
     msg_type          : noc_msg_type;
     reserved          : reserved_field_type)
@@ -300,7 +313,8 @@ package body nocpackage is
     return local_yx is
     variable ret : local_yx;
   begin  -- get_origin_y
-    ret := flit(29 downto 27);
+    ret := flit(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto
+                NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH);
     return ret;
   end get_origin_y;
 
@@ -308,8 +322,9 @@ package body nocpackage is
     flit : noc_flit_type)
     return local_yx is
     variable ret : local_yx;
-  begin  -- get_origin_y
-    ret := flit(24 downto 22);
+  begin  -- get_origin_x
+    ret := flit(NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH - 1 downto
+                NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH);
     return ret;
   end get_origin_x;
 
@@ -318,8 +333,8 @@ package body nocpackage is
     return noc_msg_type is
     variable msg : noc_msg_type;
   begin
-    msg := flit(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
-                NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH);
+    msg := flit(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
+                NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH);
     return msg;
   end get_msg_type;
 
@@ -337,8 +352,8 @@ package body nocpackage is
     return reserved_field_type is
     variable ret : reserved_field_type;
   begin
-    ret := flit(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
-                NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH);
+    ret := flit(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
+                NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH);
     return ret;
   end get_reserved_field;
 
@@ -364,55 +379,101 @@ package body nocpackage is
     end if;
   end is_getm;
 
+  function idx_to_x (
+    i : integer)
+    return local_yx is
+  begin
+    return std_logic_vector(to_unsigned(i mod RING_LEN, YX_WIDTH));
+  end idx_to_x;
+
+  function idx_to_y (
+    i : integer)
+    return local_yx is
+  begin
+    return std_logic_vector(to_unsigned(i / RING_LEN, YX_WIDTH));
+  end idx_to_y;
+
+  -- Column-serpentine Hamiltonian index (even columns 0->YLEN-1, odd columns YLEN-1->0)
+  function get_hamiltonian_index (
+    local_y : local_yx;
+    local_x : local_yx)
+    return integer is
+    variable col_base : integer;
+    variable ly       : integer;
+    variable lx       : integer;
+  begin
+    lx := to_integer(unsigned(local_x));
+    ly := to_integer(unsigned(local_y));
+    col_base := lx * RING_LEN;
+    if local_x(0) = '0' then
+      return col_base + ly;
+    else
+      return col_base + (RING_LEN - 1 - ly);
+    end if;
+  end get_hamiltonian_index;
+
   function create_header (
-    -- local_y           : local_yx;
+     local_y           : local_yx;
     local_x           : local_yx;
-    -- remote_y          : local_yx;
+     remote_y          : local_yx;
     remote_x          : local_yx;
     msg_type          : noc_msg_type;
     reserved          : reserved_field_type)
     return noc_flit_type is
     variable header : std_logic_vector(NOC_FLIT_SIZE - 1 downto 0);
-    variable go_left, go_right, go_up, go_down : std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
+    variable routing_bits : std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
+    variable id_loc, id_rem : integer;
+    variable ring_len, dist_cw, dist_ccw : integer;
   begin  -- create_header
     header := (others => '0');
+    ring_len := RING_LEN;
+
+    -- Hamiltonian (column-serpentine) index
+    id_loc := get_hamiltonian_index(local_y, local_x);
+    id_rem := get_hamiltonian_index(remote_y, remote_x);
+
+    -- Clamp IDs to ring length to avoid invalid destinations when inputs are out of range
+    id_loc := id_loc mod ring_len;
+    id_rem := id_rem mod ring_len;
+
     header(NOC_FLIT_SIZE - 1 downto
            NOC_FLIT_SIZE - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
-    -- header(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto
-    --       NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH) := "00" & local_y;
     header(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto
-           NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH) := "00" & local_x;
-    -- header(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-    --       NOC_FLIT_SIZE - PREAMBLE_WIDTH - 3*YX_WIDTH) := "00" & remote_y;
+           NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH) := std_logic_vector(to_unsigned(id_loc, YX_WIDTH));
     header(NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH - 1 downto
-           NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH) := "00" & remote_x;
+           NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH) := std_logic_vector(to_unsigned(id_rem, YX_WIDTH));
     header(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
            NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
     header(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
            NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH) := reserved;
+    -- Pack local_y/local_x just below reserved (keeps offsets aligned with standalone generator)
+    header(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - 1 downto
+           NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - YX_WIDTH) := local_y;
+    header(NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - YX_WIDTH - 1 downto
+           NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - 2*YX_WIDTH) := local_x;
 
-    if local_x < remote_x then
-      go_right := "01000"; -- go_right := "01000";
+    -- Match standalone ring header generation (go_left/go_right then AND with 011)
+    dist_cw  := (id_rem + ring_len - id_loc) mod ring_len;
+    dist_ccw := (id_loc + ring_len - id_rem) mod ring_len;
+    routing_bits := (others => '0');
+    if id_loc < id_rem then
+      routing_bits := "010";  -- go_right
     else
-      go_right := "10111"; -- go_right := "10111";
+      routing_bits := "101";  -- mask out go_right
     end if;
 
-    if local_x > remote_x then
-      go_left := "00100"; -- go_left := "00100";
+    if id_loc > id_rem then
+      routing_bits := routing_bits and "001"; -- go_left
     else
-      go_left := "11011"; -- go_left := "11011";
+      routing_bits := routing_bits and "110";
     end if;
 
-    -- if local_y < remote_y then
-    --   header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01110" and go_left and go_right;
-    -- else
-    --   header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01101" and go_left and go_right;
-    -- end if;
-	header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01100" and go_left and go_right;
-
-    if local_x = remote_x then
-      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "10000";
+    routing_bits := routing_bits and "011";
+    if id_loc = id_rem then
+      routing_bits := "100";
     end if;
+
+    header(NEXT_ROUTING_WIDTH - 1 downto 0) := routing_bits;
 
     return header;
   end create_header;

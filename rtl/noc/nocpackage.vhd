@@ -49,14 +49,18 @@ package nocpackage is
   constant PREAMBLE_WIDTH      : natural := 2;
   constant YX_WIDTH            : natural := GLOB_YX_WIDTH;
   constant MSG_TYPE_WIDTH      : natural := 5;
-  constant RESERVED_WIDTH      : natural := 8;
-  constant RESERVED_WIDTH_MISC : natural := 6;
   constant NEXT_ROUTING_WIDTH  : natural := 3;
-  constant COH_NOC_FLIT_SIZE       : natural := PREAMBLE_WIDTH + COH_NOC_WIDTH;
-  constant DMA_NOC_FLIT_SIZE       : natural := PREAMBLE_WIDTH + DMA_NOC_WIDTH;
+  -- Ring misc NoC uses 3-bit Hamiltonian ids (matches SV router xWidth)
+  constant RING_ID_WIDTH       : natural := 3;
+  constant COH_NOC_FLIT_SIZE   : natural := PREAMBLE_WIDTH + COH_NOC_WIDTH;
+  constant DMA_NOC_FLIT_SIZE   : natural := PREAMBLE_WIDTH + DMA_NOC_WIDTH;
   constant MISC_NOC_FLIT_SIZE  : natural := PREAMBLE_WIDTH + 32;
   constant ARCH_NOC_FLIT_SIZE  : natural := PREAMBLE_WIDTH + ARCH_BITS;
-  constant MAX_NOC_FLIT_SIZE  : natural := PREAMBLE_WIDTH + MAX_NOC_WIDTH;
+  constant MAX_NOC_FLIT_SIZE   : natural := PREAMBLE_WIDTH + MAX_NOC_WIDTH;
+  -- Ring header layout (MSB->LSB):
+  -- preamble | src_id | dst_id | msg | reserved | local_y | local_x | routing
+  constant RESERVED_WIDTH      : natural := COH_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - 2*YX_WIDTH - NEXT_ROUTING_WIDTH;
+  constant RESERVED_WIDTH_MISC : natural := MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - 2*YX_WIDTH - NEXT_ROUTING_WIDTH;
 
   subtype local_yx is std_logic_vector(YX_WIDTH-1 downto 0);
   subtype noc_preamble_type is std_logic_vector(PREAMBLE_WIDTH-1 downto 0);
@@ -499,11 +503,25 @@ package nocpackage is
     msg : noc_msg_type)
     return boolean;
 
+  -- Hamiltonian helpers (match standalone ring NoC testbench)
+  function idx_to_x (
+    i : integer)
+    return local_yx;
+
+  function idx_to_y (
+    i : integer)
+    return local_yx;
+
+  function get_hamiltonian_index (
+    local_y : local_yx;
+    local_x : local_yx)
+    return integer;
+
   function create_header (
     constant flit_sz : integer;
---    local_y          : local_yx;
+    local_y          : local_yx;
     local_x          : local_yx;
---    remote_y         : local_yx;
+    remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_type)
@@ -511,9 +529,9 @@ package nocpackage is
 
   function create_header_misc (
     constant flit_sz : integer;
-  --  local_y          : local_yx;
+    local_y          : local_yx;
     local_x          : local_yx;
-  --  remote_y         : local_yx;
+    remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_misc_type)
@@ -543,9 +561,7 @@ package nocpackage is
     constant TECH     : integer;
     constant CFG_XLEN : integer;
     constant CFG_YLEN : integer;
-    constant local_x  : local_yx
---    constant local_y  : local_yx)
-    )
+    constant local_x  : local_yx)
     return ports_vec;
 
   -- IRQ snd packet (Header + 2 flits):
@@ -583,6 +599,30 @@ end nocpackage;
 
 package body nocpackage is
 
+  -- Convert Hamiltonian ring ID to grid X coordinate
+  function ring_id_to_x(id : integer) return local_yx is
+    variable x_int : integer;
+  begin
+    x_int := id / CFG_YLEN;
+    return conv_std_logic_vector(x_int, YX_WIDTH);
+  end;
+
+  -- Convert Hamiltonian ring ID to grid Y coordinate
+  function ring_id_to_y(id : integer) return local_yx is
+    variable x_int    : integer;
+    variable y_serp   : integer;
+    variable y_int    : integer;
+  begin
+    x_int  := id / CFG_YLEN;
+    y_serp := id mod CFG_YLEN;
+    if (x_int mod 2) = 0 then
+      y_int := y_serp;
+    else
+      y_int := CFG_YLEN - 1 - y_serp;
+    end if;
+    return conv_std_logic_vector(y_int, YX_WIDTH);
+  end;
+
   function ncpu_log(
     ncpu : integer)
     return integer is
@@ -619,9 +659,12 @@ package body nocpackage is
     flit : max_noc_flit_type)
     return local_yx is
     variable ret : local_yx;
+    variable id  : integer;
   begin  -- get_origin_y
     ret := (others => '0');
-    ret := flit(flit_sz - PREAMBLE_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - YX_WIDTH);
+    id  := to_integer(unsigned(flit(flit_sz - PREAMBLE_WIDTH - 1 downto
+                                    flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH)));
+    ret := ring_id_to_y(id);
     return ret;
   end get_origin_y;
 
@@ -630,9 +673,12 @@ package body nocpackage is
     flit : max_noc_flit_type)
     return local_yx is
     variable ret : local_yx;
+    variable id  : integer;
   begin  -- get_origin_x
     ret := (others => '0');
-    ret := flit(flit_sz - PREAMBLE_WIDTH - YX_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH);
+    id  := to_integer(unsigned(flit(flit_sz - PREAMBLE_WIDTH - 1 downto
+                                    flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH)));
+    ret := ring_id_to_x(id);
     return ret;
   end get_origin_x;
 
@@ -641,9 +687,12 @@ package body nocpackage is
     flit : max_noc_flit_type)
     return local_yx is
     variable ret : local_yx;
+    variable id  : integer;
   begin  -- get_destination_y
     ret := (others => '0');
-    ret := flit(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - YX_WIDTH);
+    id  := to_integer(unsigned(flit(flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH - 1 downto
+                                    flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH)));
+    ret := ring_id_to_y(id);
     return ret;
   end get_destination_y;
 
@@ -652,9 +701,12 @@ package body nocpackage is
     flit : max_noc_flit_type)
     return local_yx is
     variable ret : local_yx;
+    variable id  : integer;
   begin  -- get_destination_x
     ret := (others => '0');
-    ret := flit(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - YX_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 2*YX_WIDTH);
+    id  := to_integer(unsigned(flit(flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH - 1 downto
+                                    flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH)));
+    ret := ring_id_to_x(id);
     return ret;
   end get_destination_x;
 
@@ -665,8 +717,8 @@ package body nocpackage is
     variable msg : noc_msg_type;
   begin
     msg := (others => '0');
-    msg := flit(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
-                flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH);
+    msg := flit(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - 1 downto
+                flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH);
     return msg;
   end get_msg_type;
 
@@ -686,8 +738,8 @@ package body nocpackage is
     return reserved_field_type is
     variable ret : reserved_field_type;
   begin
-    ret := flit(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
-                flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH);
+    ret := flit(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - 1 downto
+                flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH);
     return ret;
   end get_reserved_field;
 
@@ -697,7 +749,7 @@ package body nocpackage is
     return std_ulogic is
     variable ret : std_ulogic;
   begin
-    ret := flit(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - 1);
+    ret := flit(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - 1);
     return ret;
   end get_unused_msb_field;
 
@@ -705,9 +757,12 @@ package body nocpackage is
     flit : misc_noc_flit_type)
     return local_yx is
     variable ret : local_yx;
+    variable id  : integer;
   begin  -- get_origin_y
     ret := (others => '0');
-    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH);
+    id  := to_integer(unsigned(flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto
+                                    MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - RING_ID_WIDTH)));
+    ret := ring_id_to_y(id);
     return ret;
   end get_origin_y_misc;
 
@@ -715,9 +770,12 @@ package body nocpackage is
     flit : misc_noc_flit_type)
     return local_yx is
     variable ret : local_yx;
+    variable id  : integer;
   begin  -- get_origin_x
     ret := (others => '0');
-    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - YX_WIDTH - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH);
+    id  := to_integer(unsigned(flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto
+                                    MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - RING_ID_WIDTH)));
+    ret := ring_id_to_x(id);
     return ret;
   end get_origin_x_misc;
 
@@ -725,9 +783,12 @@ package body nocpackage is
     flit : misc_noc_flit_type)
     return local_yx is
     variable ret : local_yx;
+    variable id  : integer;
   begin  -- get_destination_y
     ret := (others => '0');
-    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - YX_WIDTH);
+    id  := to_integer(unsigned(flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - RING_ID_WIDTH - 1 downto
+                                    MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*RING_ID_WIDTH)));
+    ret := ring_id_to_y(id);
     return ret;
   end get_destination_y_misc;
 
@@ -735,9 +796,12 @@ package body nocpackage is
     flit : misc_noc_flit_type)
     return local_yx is
     variable ret : local_yx;
+    variable id  : integer;
   begin  -- get_destination_x
     ret := (others => '0');
-    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - YX_WIDTH - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*YX_WIDTH - 2*YX_WIDTH);
+    id  := to_integer(unsigned(flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - RING_ID_WIDTH - 1 downto
+                                    MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*RING_ID_WIDTH)));
+    ret := ring_id_to_x(id);
     return ret;
   end get_destination_x_misc;
 
@@ -747,8 +811,8 @@ package body nocpackage is
     variable msg : noc_msg_type;
   begin
     msg := (others => '0');
-    msg := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
-                MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH);
+    msg := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - 1 downto
+                MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH);
     return msg;
   end get_msg_type_misc;
 
@@ -766,8 +830,8 @@ package body nocpackage is
     return reserved_field_misc_type is
     variable ret : reserved_field_misc_type;
   begin
-    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
-                MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC);
+    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - 1 downto
+                MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC);
     return ret;
   end get_reserved_field_misc;
 
@@ -776,7 +840,7 @@ package body nocpackage is
     return std_ulogic is
     variable ret : std_ulogic;
   begin
-    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - 1);
+    ret := flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC - 1);
     return ret;
   end get_unused_msb_field_misc;
 
@@ -802,100 +866,111 @@ package body nocpackage is
     end if;
   end is_getm;
 
+  function idx_to_x (
+    i : integer)
+    return local_yx is
+  begin
+    return std_logic_vector(to_unsigned(i mod CFG_XLEN, YX_WIDTH));
+  end idx_to_x;
+
+  function idx_to_y (
+    i : integer)
+    return local_yx is
+  begin
+    return std_logic_vector(to_unsigned(i / CFG_XLEN, YX_WIDTH));
+  end idx_to_y;
+
+  -- Column-serpentine Hamiltonian index (even columns 0->YLEN-1, odd columns YLEN-1->0)
+  function get_hamiltonian_index (
+    local_y : local_yx;
+    local_x : local_yx)
+    return integer is
+    variable col_base : integer;
+    variable ly       : integer;
+    variable lx       : integer;
+  begin
+    lx := to_integer(unsigned(local_x));
+    ly := to_integer(unsigned(local_y));
+    col_base := lx * CFG_YLEN;
+    if local_x(0) = '0' then
+      return col_base + ly;
+    else
+      return col_base + (CFG_YLEN - 1 - ly);
+    end if;
+  end get_hamiltonian_index;
+
   function create_header (
     constant flit_sz : integer;
---    local_y          : local_yx;
+    local_y          : local_yx;
     local_x          : local_yx;
---    remote_y         : local_yx;
+    remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_type)
     return std_logic_vector is
-    variable header                            : std_logic_vector(flit_sz - 1 downto 0);
-    variable go_left, go_right, go_up, go_down : std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
---    variable dist_cw, dist_ccw : std_logic_vector(YX_WIDTH - 1 downto 0);
-    variable local_x_int   : integer;
-    variable remote_x_int  : integer;
-    variable dist_cw       : integer;
-    variable dist_ccw      : integer;
+    variable header : std_logic_vector(flit_sz - 1 downto 0);
+    variable id_loc, id_rem : integer;
+    variable ring_len, dist_cw, dist_ccw : integer;
+    variable go_left, go_right : std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
+    variable id_loc_vec, id_rem_vec : std_logic_vector(RING_ID_WIDTH-1 downto 0);
   begin  -- create_header
     header := (others => '0');
-    header(flit_sz - 1 downto
-           flit_sz - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
-    header(flit_sz - PREAMBLE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := "0000";
-    header(flit_sz - PREAMBLE_WIDTH - YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := local_x;
-    header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := "0000";
-    header(flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH) := remote_x;
-    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
-    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH) := reserved;
+    ring_len := CFG_XLEN * CFG_YLEN;
 
---    if local_x < remote_x then
---      go_right := "01000";
---    else
---      go_right := "10111";
---    end if;
---
---    if local_x > remote_x then
---      go_left := "00100";
---    else
---      go_left := "11011";
---    end if;
---
---    if local_y < remote_y then
---      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01110" and go_left and go_right;
---    else
---      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01101" and go_left and go_right;
---    end if;
---
---    if local_y = remote_y and local_x = remote_x then
---      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "10000";
---    end if;
+    -- Hamiltonian (column-serpentine) index
+    id_loc := get_hamiltonian_index(local_y, local_x);
+    id_rem := get_hamiltonian_index(remote_y, remote_x);
 
-  -- Convert to integers
-  local_x_int  := to_integer(unsigned(local_x));
-  remote_x_int := to_integer(unsigned(remote_x));
+    -- Clamp IDs to ring length to avoid invalid destinations when inputs are out of range
+    id_loc := id_loc mod ring_len;
+    id_rem := id_rem mod ring_len;
 
-  -- Compute wraparound distances
-  dist_cw  := (remote_x_int - local_x_int + CFG_XLEN) mod CFG_XLEN;
-  dist_ccw := (local_x_int - remote_x_int + CFG_XLEN) mod CFG_XLEN;
+    id_loc_vec := conv_std_logic_vector(id_loc, RING_ID_WIDTH);
+    id_rem_vec := conv_std_logic_vector(id_rem, RING_ID_WIDTH);
 
-    -- Compute direction control signals
-  if local_x_int < remote_x_int then
-    if dist_cw > dist_ccw then
-      go_left  := "001";
-      go_right := "101";
+    header(flit_sz - 1 downto flit_sz - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
+    header(flit_sz - PREAMBLE_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH) := id_loc_vec;
+    header(flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH) := id_rem_vec;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH) := msg_type;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH) := reserved;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - YX_WIDTH) := local_y;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - YX_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - 2*YX_WIDTH) := local_x;
+
+    -- Match standalone ring header generation (go_left/go_right then AND with 011)
+    dist_cw  := (id_rem + ring_len - id_loc) mod ring_len;
+    dist_ccw := (id_loc + ring_len - id_rem) mod ring_len;
+
+    if id_loc < id_rem then
+      go_right := "010"; -- Move East (1)
     else
-      go_right := "010";
-      go_left  := "110";
+      go_right := "101"; -- Mask out go_right
     end if;
-  elsif local_x_int > remote_x_int then
-    if dist_cw > dist_ccw then
-      go_left  := "001";
-      go_right := "101";
+
+    if id_loc > id_rem then
+      go_left := "001";  -- Move West (0)
     else
-      go_right := "010";
-      go_left  := "110";
+      go_left := "110";  -- Mask out go_left
     end if;
-  end if;
 
-  -- Set direction bits in header
-  header(NEXT_ROUTING_WIDTH - 1 downto 0) := "011" and go_left and go_right;
-
-  -- Handle local delivery case
-  if local_x_int = remote_x_int then
-    header(NEXT_ROUTING_WIDTH - 1 downto 0) := "100";
-  end if;
+    header(NEXT_ROUTING_WIDTH - 1 downto 0) := "011" and go_left and go_right;
+    if id_loc = id_rem then
+      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "100"; -- go_local
+    end if;
+    if header(NEXT_ROUTING_WIDTH - 1 downto 0) = "011" then
+      report "create_header produced routing=011 (id_loc=" & integer'image(id_loc) &
+             ", id_rem=" & integer'image(id_rem) &
+             ", dist_cw=" & integer'image(dist_cw) &
+             ", dist_ccw=" & integer'image(dist_ccw)
+        severity warning;
+    end if;
 
     return header;
   end create_header;
 
-function create_header_mcast (
+  function create_header_mcast (
     constant flit_sz  : integer;
     local_y           : local_yx;
     local_x           : local_yx;
@@ -907,13 +982,19 @@ function create_header_mcast (
     msg_type          : noc_msg_type)
     return std_logic_vector is
     variable header : std_logic_vector(flit_sz - 1 downto 0);
-    variable go_right, go_left, go_up, go_down, routing: std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
+    variable go_left, go_right : std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
     variable remote_y, remote_x : yx_vec(MAX_MCAST_DESTS - 1 downto 0);
-    constant RESERVED_OFFSET_MCAST : integer := flit_sz - PREAMBLE_WIDTH - NEXT_ROUTING_WIDTH - MSG_TYPE_WIDTH
-                                                - (1 + MAX_MCAST_DESTS) * 2 * YX_WIDTH - MAX_MCAST_DESTS;
+    variable remote_id : std_logic_vector(RING_ID_WIDTH - 1 downto 0);
+    variable extra_id  : std_logic_vector(RING_ID_WIDTH - 1 downto 0);
+    variable reserved  : reserved_field_type;
+    variable ring_len, dist_cw, dist_ccw : integer;
+    variable id_loc, id_rem : integer;
+    variable id_loc_vec, id_rem_vec : std_logic_vector(RING_ID_WIDTH-1 downto 0);
   begin  -- create_header_ndest
 
     header := (others => '0');
+    reserved := (others => '0');
+    ring_len := CFG_XLEN * CFG_YLEN;
 
     remote_y := (others => (others => '0'));
     remote_x := (others => (others => '0'));
@@ -922,143 +1003,136 @@ function create_header_mcast (
     remote_y(mcast_ndests) := remote_y_comb;
     remote_x(mcast_ndests) := remote_x_comb;
 
-    header(flit_sz - 1 downto
-           flit_sz - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
-    header(flit_sz - PREAMBLE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := local_y;
-    header(flit_sz - PREAMBLE_WIDTH - YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := local_x;
-    header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := remote_y(0);
-    header(flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH) := remote_x(0);
-    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
+    -- Hamiltonian (column-serpentine) IDs for source and first destination
+    id_loc := get_hamiltonian_index(local_y, local_x);
+    id_rem := get_hamiltonian_index(remote_y(0), remote_x(0));
+    -- Clamp IDs in case coordinates are out of range (keeps ring routing consistent)
+    id_loc := id_loc mod ring_len;
+    id_rem := id_rem mod ring_len;
+    id_loc_vec := conv_std_logic_vector(id_loc, RING_ID_WIDTH);
+    id_rem_vec := conv_std_logic_vector(id_rem, RING_ID_WIDTH);
+
+    header(flit_sz - 1 downto flit_sz - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
+    header(flit_sz - PREAMBLE_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH) := id_loc_vec;
+    header(flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH) := id_rem_vec;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH) := msg_type;
+
+    -- Pack any additional destinations in the reserved field using ring IDs
     for i in 1 to MAX_MCAST_DESTS - 1 loop
-      header(flit_sz - PREAMBLE_WIDTH - (4+2*(i-1))*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_OFFSET_MCAST - 1 downto
-             flit_sz - PREAMBLE_WIDTH - (5+2*(i-1))*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_OFFSET_MCAST) := remote_y(i);
-      header(flit_sz - PREAMBLE_WIDTH - (5+2*(i-1))*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_OFFSET_MCAST - 1 downto
-             flit_sz - PREAMBLE_WIDTH - (6+2*(i-1))*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_OFFSET_MCAST) := remote_x(i);
-    end loop;
-
-
-    for i in 0 to MAX_MCAST_DESTS - 1 loop
       if i <= mcast_ndests then
-          header(flit_sz - PREAMBLE_WIDTH - (1 + MAX_MCAST_DESTS) * 2 * YX_WIDTH - MSG_TYPE_WIDTH
-                 - MAX_MCAST_DESTS - RESERVED_OFFSET_MCAST + i) := '1';
-          if local_x < remote_x(i) then
-            go_right := "01000";
-          else
-            go_right := "10111";
-          end if;
-
-          if local_x > remote_x(i) then
-            go_left := "00100";
-          else
-            go_left := "11011";
-          end if;
-
-          if local_y < remote_y(i) then
-            routing := "01110" and go_left and go_right;
-          else
-            routing := "01101" and go_left and go_right;
-          end if;
-
-          if local_y = remote_y(i) and local_x = remote_x(i) then
-            routing := "10000";
-          end if;
+        id_rem := get_hamiltonian_index(remote_y(i), remote_x(i));
+        id_rem := id_rem mod ring_len;
+        extra_id := conv_std_logic_vector(id_rem, RING_ID_WIDTH);
+        reserved(RESERVED_WIDTH - i*RING_ID_WIDTH downto RESERVED_WIDTH - i*RING_ID_WIDTH - (RING_ID_WIDTH - 1)) := extra_id;
+        reserved(i-1) := '1'; -- mark destination as valid
       end if;
-      header(NEXT_ROUTING_WIDTH-1 downto 0) := header(NEXT_ROUTING_WIDTH-1 downto 0) or routing;
     end loop;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH) := reserved;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - YX_WIDTH) := local_y;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - YX_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH - 2*YX_WIDTH) := local_x;
+
+    -- Choose direction for first destination only (ring path is single next hop)
+    -- Match standalone ring header generation (go_left/go_right then AND with 011)
+    dist_cw  := (id_rem + ring_len - id_loc) mod ring_len;
+    dist_ccw := (id_loc + ring_len - id_rem) mod ring_len;
+
+    if id_loc < id_rem then
+      go_right := "010"; -- Move East (1)
+    else
+      go_right := "101"; -- Mask out go_right
+    end if;
+
+    if id_loc > id_rem then
+      go_left := "001";  -- Move West (0)
+    else
+      go_left := "110";  -- Mask out go_left
+    end if;
+
+    header(NEXT_ROUTING_WIDTH-1 downto 0) := "011" and go_left and go_right;
+    if id_loc = id_rem then
+      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "100"; -- go_local
+    end if;
+    if header(NEXT_ROUTING_WIDTH-1 downto 0) = "011" then
+      report "create_header_mcast produced routing=011 (id_loc=" & integer'image(id_loc) &
+             ", id_rem=" & integer'image(id_rem) &
+             ", dist_cw=" & integer'image(dist_cw) &
+             ", dist_ccw=" & integer'image(dist_ccw)
+        severity warning;
+    end if;
 
     return header;
   end create_header_mcast;
 
   function create_header_misc (
     constant flit_sz : integer;
-    -- local_y          : local_yx;
+    local_y          : local_yx;
     local_x          : local_yx;
-    -- remote_y         : local_yx;
+    remote_y         : local_yx;
     remote_x         : local_yx;
     msg_type         : noc_msg_type;
     reserved         : reserved_field_misc_type)
     return std_logic_vector is
-    variable header                            : std_logic_vector(flit_sz - 1 downto 0);
-    variable go_left, go_right, go_up, go_down : std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
-variable local_x_int   : integer;
-    variable remote_x_int  : integer;
-    variable dist_cw       : integer;
-    variable dist_ccw      : integer;
- 
+    variable header : std_logic_vector(flit_sz - 1 downto 0);
+    variable id_loc, id_rem : integer;
+    variable ring_len, dist_cw, dist_ccw : integer;
+    variable go_left, go_right : std_logic_vector(NEXT_ROUTING_WIDTH - 1 downto 0);
+    variable id_loc_vec, id_rem_vec : std_logic_vector(RING_ID_WIDTH-1 downto 0);
   begin  -- create_header
     header := (others => '0');
     header(flit_sz - 1 downto
            flit_sz - PREAMBLE_WIDTH) := PREAMBLE_HEADER;
-    header(flit_sz - PREAMBLE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - YX_WIDTH) := "0000";
-    header(flit_sz - PREAMBLE_WIDTH - YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH) := local_x;
-    header(flit_sz - PREAMBLE_WIDTH - 2*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH) := "0000";
-    header(flit_sz - PREAMBLE_WIDTH - 3*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH) := remote_x;
-    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH) := msg_type;
-    header(flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - 1 downto
-           flit_sz - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC) := reserved;
---    if local_x < remote_x then
---      go_right := "01000";
---    else
---      go_right := "10111";
---    end if;
+    ring_len := CFG_XLEN * CFG_YLEN;
+    id_loc := get_hamiltonian_index(local_y, local_x);
+    id_rem := get_hamiltonian_index(remote_y, remote_x);
+    -- Clamp IDs to ring length to avoid invalid destinations when inputs are out of range
+    id_loc := id_loc mod ring_len;
+    id_rem := id_rem mod ring_len;
+    id_loc_vec := conv_std_logic_vector(id_loc, RING_ID_WIDTH);
+    id_rem_vec := conv_std_logic_vector(id_rem, RING_ID_WIDTH);
 
---    if local_x > remote_x then
---      go_left := "00100";
---    else
---      go_left := "11011";
---    end if;
+    header(flit_sz - PREAMBLE_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH) := id_loc_vec;
+    header(flit_sz - PREAMBLE_WIDTH - RING_ID_WIDTH - 1 downto flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH) := id_rem_vec;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH) := msg_type;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC) := reserved;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC - YX_WIDTH) := local_y;
+    header(flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC - YX_WIDTH - 1 downto
+           flit_sz - PREAMBLE_WIDTH - 2*RING_ID_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC - 2*YX_WIDTH) := local_x;
 
---    if local_y < remote_y then
- --     header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01110" and go_left and go_right;
---    else
- --     header(NEXT_ROUTING_WIDTH - 1 downto 0) := "01101" and go_left and go_right;
---    end if;
+    -- Match standalone ring header generation (go_left/go_right then AND with 011)
+    dist_cw  := (id_rem + ring_len - id_loc) mod ring_len;
+    dist_ccw := (id_loc + ring_len - id_rem) mod ring_len;
 
---    if local_y = remote_y and local_x = remote_x then
- --     header(NEXT_ROUTING_WIDTH - 1 downto 0) := "10000";
---    end if;
- local_x_int  := to_integer(unsigned(local_x));
-  remote_x_int := to_integer(unsigned(remote_x));
-
-  -- Compute wraparound distances
-  dist_cw  := (remote_x_int - local_x_int + CFG_XLEN) mod CFG_XLEN;
-  dist_ccw := (local_x_int - remote_x_int + CFG_XLEN) mod CFG_XLEN;
-
-    -- Compute direction control signals
-  if local_x_int < remote_x_int then
-    if dist_cw > dist_ccw then
-      go_left  := "001";
-      go_right := "101";
+    if id_loc < id_rem then
+      go_right := "010"; -- Move East (1)
     else
-      go_right := "010";
-      go_left  := "110";
+      go_right := "101"; -- Mask out go_right
     end if;
-  elsif local_x_int > remote_x_int then
-    if dist_cw > dist_ccw then
-      go_left  := "001";
-      go_right := "101";
-    else
-      go_right := "010";
-      go_left  := "110";
-    end if;
-  end if;
-  -- Set direction bits in header
-  header(NEXT_ROUTING_WIDTH - 1 downto 0) := "011" and go_left and go_right;
 
-  -- Handle local delivery case
-  if local_x_int = remote_x_int then
-    header(NEXT_ROUTING_WIDTH - 1 downto 0) := "100";
-  end if;
+    if id_loc > id_rem then
+      go_left := "001";  -- Move West (0)
+    else
+      go_left := "110";  -- Mask out go_left
+    end if;
+
+    header(NEXT_ROUTING_WIDTH - 1 downto 0) := "011" and go_left and go_right;
+    if id_loc = id_rem then
+      header(NEXT_ROUTING_WIDTH - 1 downto 0) := "100"; -- go_local
+    end if;
+    if header(NEXT_ROUTING_WIDTH - 1 downto 0) = "011" then
+      report "create_header_misc produced routing=011 (id_loc=" & integer'image(id_loc) &
+             ", id_rem=" & integer'image(id_rem) &
+             ", dist_cw=" & integer'image(dist_cw) &
+             ", dist_ccw=" & integer'image(dist_ccw)
+        severity warning;
+    end if;
 
     return header;
   end create_header_misc;
@@ -1073,16 +1147,12 @@ variable local_x_int   : integer;
     preamble := get_preamble(MISC_NOC_FLIT_SIZE, misc_noc_flit_pad & narrow_flit);
 
     if preamble = PREAMBLE_HEADER or preamble = PREAMBLE_1FLIT then
-      ret(ARCH_NOC_FLIT_SIZE - 1 downto ARCH_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH) :=
-        narrow_flit(MISC_NOC_FLIT_SIZE - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH);
-      ret(ARCH_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH -  1 downto ARCH_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH) :=
-        "00" & narrow_flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH -  1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC);
+      ret(ARCH_NOC_FLIT_SIZE - 1 downto ARCH_NOC_FLIT_SIZE - (MISC_NOC_FLIT_SIZE - NEXT_ROUTING_WIDTH)) :=
+        narrow_flit(MISC_NOC_FLIT_SIZE - 1 downto NEXT_ROUTING_WIDTH);
       ret(NEXT_ROUTING_WIDTH - 1 downto 0) := narrow_flit(NEXT_ROUTING_WIDTH - 1 downto 0);
     else
-      ret(ARCH_NOC_FLIT_SIZE - 1 downto ARCH_NOC_FLIT_SIZE - PREAMBLE_WIDTH) :=
-        narrow_flit(MISC_NOC_FLIT_SIZE - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH);
-      ret(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto 0) :=
-        narrow_flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto 0);
+      ret(ARCH_NOC_FLIT_SIZE - 1 downto ARCH_NOC_FLIT_SIZE - MISC_NOC_FLIT_SIZE) :=
+        narrow_flit(MISC_NOC_FLIT_SIZE - 1 downto 0);
     end if;
 
     return ret;
@@ -1098,16 +1168,13 @@ variable local_x_int   : integer;
     preamble := get_preamble(ARCH_NOC_FLIT_SIZE, arch_noc_flit_pad & large_flit);
 
     if preamble = PREAMBLE_HEADER or preamble = PREAMBLE_1FLIT then
-      ret(MISC_NOC_FLIT_SIZE - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH) :=
-        large_flit(ARCH_NOC_FLIT_SIZE - 1 downto ARCH_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH);
-      ret(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH -  1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH_MISC) :=
-        large_flit(ARCH_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH + RESERVED_WIDTH_MISC - 1 downto ARCH_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 4*YX_WIDTH - MSG_TYPE_WIDTH - RESERVED_WIDTH);
+      ret(MISC_NOC_FLIT_SIZE - 1 downto NEXT_ROUTING_WIDTH) :=
+        large_flit(ARCH_NOC_FLIT_SIZE - 1 downto ARCH_NOC_FLIT_SIZE - (MISC_NOC_FLIT_SIZE - NEXT_ROUTING_WIDTH));
       ret(NEXT_ROUTING_WIDTH - 1 downto 0) := large_flit(NEXT_ROUTING_WIDTH - 1 downto 0);
     else
-      ret(MISC_NOC_FLIT_SIZE - 1 downto MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH) :=
-        large_flit(ARCH_NOC_FLIT_SIZE - 1 downto ARCH_NOC_FLIT_SIZE - PREAMBLE_WIDTH);
-      ret(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto 0) :=
-        large_flit(MISC_NOC_FLIT_SIZE - PREAMBLE_WIDTH - 1 downto 0);
+      ret(MISC_NOC_FLIT_SIZE - 1 downto NEXT_ROUTING_WIDTH) :=
+        large_flit(MISC_NOC_FLIT_SIZE - 1 downto NEXT_ROUTING_WIDTH);
+      ret(NEXT_ROUTING_WIDTH - 1 downto 0) := large_flit(NEXT_ROUTING_WIDTH - 1 downto 0);
     end if;
 
     return ret;
@@ -1123,41 +1190,16 @@ variable local_x_int   : integer;
     constant CFG_XLEN : integer;
     constant CFG_YLEN : integer;
     constant local_x  : local_yx
---    constant local_y  : local_yx
 			     )
     return ports_vec is
     variable ports : ports_vec;
  begin
     ports := (others => '0');
-    --   0,0    - 0,1 - 0,2 - ... -    0,XLEN-1
-    --    |        |     |     |          |
-    --   1,0    - ...   ...   ... -    1,XLEN-1
-    --    |        |     |     |          |
-    --   ...    - ...   ...   ... -      ...
-    --    |        |     |     |          |
-    -- YLEN-1,0 - ...   ...   ... - YLEN-1,XLEN-1
-   -- for i in 0 to YLEN-1 loop
-      for i in 0 to CFG_XLEN-1 loop
-        -- local ports are all set
-        ports(2) := '1';
-       -- if i /= XLEN-1 then
-          -- east ports
-        ports(1) := '1';
-       -- end if;
-       -- if j /= 0 then
-          -- west ports
-          ports(0) := '1';
-       -- end if;
-      --  if i /= YLEN-1 then
-      --    -- south ports
-      --    ports(i * XLEN + j)(1) := '1';
-      --  end if;
-      --  if i /= 0 then
-      --    -- north ports
-      --    ports(i * XLEN + j)(0) := '1';
-      --  end if;
-      -- end loop;  -- j
-    end loop;  -- i
+    -- Ring NoC: always enable Local, East, West
+    ports(2) := '1'; -- Local
+    ports(1) := '1'; -- East (clockwise)
+    ports(0) := '1'; -- West (counter-clockwise)
     return ports;
-    end set_router_ports;
+  end set_router_ports;
+
 end nocpackage;
